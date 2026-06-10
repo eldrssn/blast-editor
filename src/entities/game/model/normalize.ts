@@ -1,0 +1,96 @@
+import { LevelConfig, BoardCellConfig } from "./types";
+
+export function normalizeLevelConfig(config: Partial<LevelConfig> | null | undefined): LevelConfig {
+  const levelId = config?.levelId || "custom_level";
+  const title = config?.title || "Пользовательский уровень";
+  const rows = config?.grid?.rows || 8;
+  const cols = config?.grid?.cols || 8;
+  const targetScore = config?.targetScore || 100;
+
+  // Normalize initial board
+  const initialBoard: Array<Array<BoardCellConfig | null>> = [];
+  if (config?.initialBoard && Array.isArray(config.initialBoard)) {
+    for (let r = 0; r < rows; r++) {
+      const row: Array<BoardCellConfig | null> = [];
+      const configRow = config.initialBoard[r];
+      for (let c = 0; c < cols; c++) {
+        if (configRow && configRow[c]) {
+          row.push({
+            filled: !!configRow[c]?.filled,
+            color: configRow[c]?.color || "#FF708A",
+            hasWater: !!configRow[c]?.hasWater
+          });
+        } else {
+          row.push(null);
+        }
+      }
+      initialBoard.push(row);
+    }
+  } else {
+    for (let r = 0; r < rows; r++) {
+      const row: Array<BoardCellConfig | null> = [];
+      for (let c = 0; c < cols; c++) {
+        row.push(null);
+      }
+      initialBoard.push(row);
+    }
+  }
+
+  const availableShapeIds = config?.figures?.availableShapeIds || ["1", "2", "3", "4", "5", "7", "10"];
+  const spawnWeights = config?.figures?.spawnWeights || {};
+  const normalizedWeights: Record<string, number> = {};
+  availableShapeIds.forEach((id) => {
+    normalizedWeights[id] = spawnWeights[id] !== undefined ? spawnWeights[id] : 10;
+  });
+
+  const colors = config?.figures?.colors || ["#FF708A", "#3CD070", "#3C70FF", "#F59E0B", "#B070FF"];
+
+  const boosters = {
+    collectAll: {
+      enabled: config?.boosters?.collectAll?.enabled !== false,
+      initialCount: config?.boosters?.collectAll?.initialCount ?? 1
+    },
+    multiplier: {
+      enabled: config?.boosters?.multiplier?.enabled !== false,
+      initialCount: config?.boosters?.multiplier?.initialCount ?? 1,
+      multiplierValue: config?.boosters?.multiplier?.multiplierValue ?? 2,
+      duration: "until_level_end" as const
+    },
+    hammer: {
+      enabled: config?.boosters?.hammer?.enabled !== false,
+      initialCount: config?.boosters?.hammer?.initialCount ?? 1,
+      areaRows: config?.boosters?.hammer?.areaRows ?? 4,
+      areaCols: config?.boosters?.hammer?.areaCols ?? 4
+    }
+  };
+
+  const protectionFromLoss = {
+    enabled: config?.protectionFromLoss?.enabled !== false,
+    clearBoardCost: config?.protectionFromLoss?.clearBoardCost ?? 20
+  };
+
+  const visual = {
+    backgroundId: config?.visual?.backgroundId || "wood_classic",
+    cubeStyle: (config?.visual?.cubeStyle || "pseudo3d") as "pseudo3d",
+    showDebugGrid: !!config?.visual?.showDebugGrid,
+    // Both default to enabled (only an explicit `false` turns them off).
+    effectsEnabled: config?.visual?.effectsEnabled !== false,
+    soundEnabled: config?.visual?.soundEnabled !== false
+  };
+
+  return {
+    levelId,
+    title,
+    grid: { rows, cols },
+    targetScore,
+    initialBoard,
+    figures: {
+      availableShapeIds,
+      spawnWeights: normalizedWeights,
+      colors
+    },
+    boosters,
+    protectionFromLoss,
+    visual
+  };
+}

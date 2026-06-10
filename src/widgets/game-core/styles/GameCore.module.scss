@@ -1,0 +1,282 @@
+.viewport {
+  width: 100%;
+  max-width: 380px;
+  aspect-ratio: 9 / 16;
+  background: radial-gradient(ellipse at center, #2e1a0c 0%, #1a0f07 100%);
+  border: 10px solid #4a3020;
+  border-radius: 22px;
+  box-shadow:
+    0 0 0 2px #6b4a2a,
+    0 16px 48px rgba(0, 0, 0, 0.7),
+    inset 0 2px 8px rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+
+  // Glass sheen overlay
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.04) 0%,
+      rgba(255, 255, 255, 0) 55%
+    );
+    pointer-events: none;
+    z-index: 10;
+    border-radius: inherit;
+  }
+}
+
+// The div that Pixi appends its <canvas> into
+.canvasContainer {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+
+  canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: inherit;
+  }
+}
+
+// ─── Booster bar ────────────────────────────────────────────────
+
+.boosterBar {
+  position: absolute;
+  top: 9%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  display: flex;
+  gap: 10px;
+  // Let drag gestures pass through the empty gaps; only buttons are interactive.
+  pointer-events: none;
+}
+
+.boosterButton {
+  pointer-events: auto;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(160deg, rgba(74, 48, 24, 0.92) 0%, rgba(42, 24, 10, 0.92) 100%);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.boosterButtonActive {
+  border-color: #ffd54a;
+  box-shadow:
+    0 0 0 2px rgba(255, 213, 74, 0.6),
+    0 4px 14px rgba(255, 213, 74, 0.35);
+}
+
+.boosterIcon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.boosterCount {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  font-family: "Inter", system-ui, sans-serif;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+// ─── Hammer selection hint ──────────────────────────────────────
+
+.hammerHint {
+  position: absolute;
+  bottom: 17%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 16;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  text-align: center;
+
+  span {
+    color: #f5e6c8;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: "Inter", system-ui, sans-serif;
+  }
+}
+
+.hammerCancel {
+  pointer-events: auto;
+  padding: 6px 18px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: "Inter", system-ui, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(239, 68, 68, 0.35);
+
+  &:active {
+    transform: translateY(1px);
+  }
+}
+
+// ─── Overlays (Victory / Loss / Protection) ─────────────────────
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  animation: overlayFadeIn 0.3s ease;
+}
+
+@keyframes overlayFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.overlayCard {
+  background: linear-gradient(145deg, #3a2410 0%, #2a1608 100%);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  padding: 28px 24px;
+  max-width: 280px;
+  width: 90%;
+  text-align: center;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  animation: cardSlideUp 0.35s ease;
+}
+
+@keyframes cardSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.overlayTitle {
+  color: #f5e6c8;
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.overlayText {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  margin: 0 0 20px;
+  font-family: "Inter", system-ui, sans-serif;
+  line-height: 1.5;
+
+  strong {
+    color: #4ade80;
+    font-weight: 700;
+  }
+}
+
+.overlayButtons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.overlayButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 24px;
+  background: linear-gradient(180deg, #4ade80 0%, #22c55e 100%);
+  border: none;
+  border-radius: 12px;
+  color: #0a2e14;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: "Inter", system-ui, sans-serif;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 4px 12px rgba(74, 222, 128, 0.3);
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(74, 222, 128, 0.4);
+  }
+
+  &:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(74, 222, 128, 0.2);
+  }
+}
+
+.overlayButtonSecondary {
+  background: linear-gradient(180deg, #6b7280 0%, #4b5563 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+
+  &:hover {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  }
+
+  &:active {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+}
