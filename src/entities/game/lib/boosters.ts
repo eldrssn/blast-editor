@@ -1,4 +1,4 @@
-import { BoardCell, HammerArea } from "../model/types";
+import { BoardCell, HammerArea, ClearedCellCoord } from "../model/types";
 
 /**
  * Collect All booster: Clears all filled cells on the board.
@@ -7,9 +7,9 @@ import { BoardCell, HammerArea } from "../model/types";
 export function applyCollectAll(board: BoardCell[][]): {
   board: BoardCell[][];
   clearedCellsCount: number;
-  clearedCellCoords: Array<{ row: number; col: number; color?: string; hasWater?: boolean }>;
+  clearedCellCoords: ClearedCellCoord[];
 } {
-  const clearedCellCoords: Array<{ row: number; col: number; color?: string; hasWater?: boolean }> = [];
+  const clearedCellCoords: ClearedCellCoord[] = [];
   
   const newBoard = board.map((row, r) =>
     row.map((cell, c) => {
@@ -50,9 +50,9 @@ export function applyHammer(
 ): {
   board: BoardCell[][];
   clearedCellsCount: number;
-  clearedCellCoords: Array<{ row: number; col: number; color?: string; hasWater?: boolean }>;
+  clearedCellCoords: ClearedCellCoord[];
 } {
-  const clearedCellCoords: Array<{ row: number; col: number; color?: string; hasWater?: boolean }> = [];
+  const clearedCellCoords: ClearedCellCoord[] = [];
 
   const newBoard = board.map((row, r) =>
     row.map((cell, c) => {

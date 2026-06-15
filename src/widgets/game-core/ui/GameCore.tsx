@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useCallback } from "react";
+import React, { useEffect, useRef, useCallback, useMemo } from "react";
 import { LevelConfig } from "@/entities/game/model/types";
 import { useGameStore } from "../model/gameStore";
 import { GameApplication } from "../pixi/GameApplication";
@@ -41,6 +41,10 @@ export default function GameCore({ config }: GameCoreProps) {
   const isPlaying = status === "playing";
   const isHammerSelecting = status === "booster_selecting" && activeBooster === "hammer";
   const showBoosters = isPlaying || isHammerSelecting;
+
+  // Protection-from-loss clear cost (water/score). 0 = free.
+  const clearCost = config.protectionFromLoss?.clearBoardCost ?? 0;
+  const canAffordClear = score >= clearCost;
 
   // Build callbacks for Pixi scene -> Zustand store
   const callbacksRef = useRef<GameSceneCallbacks>({
@@ -106,7 +110,31 @@ export default function GameCore({ config }: GameCoreProps) {
     store.setStatus("playing");
   }, []);
 
-  // Boot or reboot the Pixi application whenever config changes
+  // Structural signature: everything that requires a full rebuild + level
+  // restart. Cosmetic fields (title, visual flags, multiplier value) are
+  // excluded so changing them applies hot without wiping the in-progress board.
+  const structuralKey = useMemo(
+    () =>
+      JSON.stringify({
+        grid: config.grid,
+        targetScore: config.targetScore,
+        initialBoard: config.initialBoard,
+        figures: config.figures,
+        protectionFromLoss: config.protectionFromLoss,
+        boosters: {
+          collectAll: config.boosters.collectAll,
+          hammer: config.boosters.hammer,
+          multiplier: {
+            enabled: config.boosters.multiplier.enabled,
+            initialCount: config.boosters.multiplier.initialCount,
+            duration: config.boosters.multiplier.duration,
+          },
+        },
+      }),
+    [config]
+  );
+
+  // Boot or reboot the Pixi application only on structural changes.
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -137,6 +165,12 @@ export default function GameCore({ config }: GameCoreProps) {
       gameAppRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [structuralKey]);
+
+  // Apply cosmetic-only config changes (background, title, target, multiplier
+  // value, effects/sound toggles) hot, without a rebuild or level restart.
+  useEffect(() => {
+    gameAppRef.current?.applyVisualConfig(config);
   }, [config]);
 
   // Keep Pixi in sync whenever board / figures / score change
@@ -154,6 +188,13 @@ export default function GameCore({ config }: GameCoreProps) {
   useEffect(() => {
     if (status === "won") soundManager.play("win");
     else if (status === "lost") soundManager.play("lose");
+  }, [status]);
+
+  // Pause the scene's idle ticker on non-play states (overlays) to save frames
+  // on weak devices; resume while playing or selecting a booster.
+  useEffect(() => {
+    const active = status === "playing" || status === "booster_selecting";
+    gameAppRef.current?.setTickerActive(active);
   }, [status]);
 
   return (
@@ -262,14 +303,20 @@ export default function GameCore({ config }: GameCoreProps) {
               ⚠️ {isBoardFull ? "Короб заполнен" : "Нет доступных ходов"}
             </h2>
             <p className={styles.overlayText}>
-              Очистить поле и продолжить игру?
+              {clearCost > 0
+                ? `Очистить поле за ${clearCost} 💧 и продолжить игру?`
+                : "Очистить поле и продолжить игру?"}
             </p>
             <div className={styles.overlayButtons}>
               <button
                 className={styles.overlayButton}
                 onClick={() => clearBoardAndContinue()}
+                disabled={!canAffordClear}
+                title={canAffordClear ? undefined : "Недостаточно воды для очистки"}
               >
-                Очистить поле и продолжить
+                {clearCost > 0
+                  ? `Очистить поле (−${clearCost} 💧)`
+                  : "Очистить поле и продолжить"}
               </button>
               <button
                 className={`${styles.overlayButton} ${styles.overlayButtonSecondary}`}

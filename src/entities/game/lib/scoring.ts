@@ -10,10 +10,11 @@ import { canPlaceAnyFigure } from "./board";
  *   total = clearedCellsCount * boosterMultiplier
  */
 export function calculateScore(params: CalculateScoreParams): number {
-  const { clearedCellsCount, clearedLinesCount, isMultiplierActive } = params;
+  const { clearedCellsCount, clearedLinesCount, isMultiplierActive, multiplierValue } = params;
   if (clearedCellsCount <= 0) return 0;
 
-  const boosterMultiplier = isMultiplierActive ? 2 : 1;
+  // Use the level's configured multiplier value (default 2) instead of a hardcode.
+  const boosterMultiplier = isMultiplierActive ? (multiplierValue ?? 2) : 1;
 
   if (clearedLinesCount > 0) {
     return clearedCellsCount * clearedLinesCount * boosterMultiplier;

@@ -1,5 +1,6 @@
 import { Container, Graphics, Text, TextStyle } from "pixi.js";
-import { drawPseudo3DCube } from "./BoardLayer";
+import { getCubeContext } from "./cubeContext";
+import { ClearedCellCoord } from "@/entities/game/model/types";
 
 type GridInfo = {
   cellSize: number;
@@ -9,8 +10,6 @@ type GridInfo = {
   cols: number;
   gap: number;
 };
-
-type ClearedCell = { row: number; col: number; color?: string; hasWater?: boolean };
 
 type Point = { x: number; y: number };
 
@@ -55,11 +54,38 @@ export class EffectsLayer extends Container {
   /** When false, animations are skipped and scoring hooks fire immediately. */
   effectsEnabled = true;
 
+  /**
+   * Pool of reusable Graphics for water droplets + splash rings. Pooling avoids
+   * allocating + destroying hundreds of objects per big clear (a full-board
+   * Collect All), which is the main source of GC churn on weak devices.
+   * (Cube pops are not pooled — they share cached contexts; clearing them would
+   * wipe the shared geometry.)
+   */
+  private fxPool: Graphics[] = [];
+
   constructor() {
     super();
     this.zIndex = 100;
     // Effects must never intercept pointer events meant for the board/figures.
     this.eventMode = "none";
+  }
+
+  /** Get a clean Graphics from the pool (or a new one) and attach it. */
+  private acquireFx(): Graphics {
+    const g = this.fxPool.pop() ?? new Graphics();
+    g.visible = true;
+    g.alpha = 1;
+    g.rotation = 0;
+    g.scale.set(1);
+    this.addChild(g);
+    return g;
+  }
+
+  /** Detach + reset a Graphics and return it to the pool. */
+  private releaseFx(g: Graphics) {
+    g.clear();
+    this.removeChild(g);
+    this.fxPool.push(g);
   }
 
   // ─── Tween engine ─────────────────────────────────────────────
@@ -124,7 +150,7 @@ export class EffectsLayer extends Container {
    * `onScoreArrive` fires when the first droplet lands; `onComplete` when all do.
    */
   playLineClear(
-    cells: ClearedCell[],
+    cells: ClearedCellCoord[],
     grid: GridInfo,
     comboCount: number,
     target: Point,
@@ -150,6 +176,10 @@ export class EffectsLayer extends Container {
     const cellFull = grid.cellSize + grid.gap;
     const size = grid.cellSize;
 
+    // Scale the decorative droplets down for big clears so a full-board Collect
+    // All doesn't spawn hundreds of particles at once on weak devices.
+    const decorativePerCell = cells.length > 24 ? 0 : cells.length > 12 ? 1 : 2;
+
     // One scoring droplet per cleared cell drives the completion accounting.
     let remaining = cells.length;
     let scoreFired = false;
@@ -170,8 +200,7 @@ export class EffectsLayer extends Container {
       const color = cell.color ?? "#5eb1ff";
       const stagger = i * 14;
 
-      const cube = new Graphics();
-      drawPseudo3DCube(cube, 0, 0, size, color);
+      const cube = new Graphics(getCubeContext(color, size));
       cube.pivot.set(size / 2, size / 2);
       cube.position.set(cx, cy);
       this.addChild(cube);
@@ -191,9 +220,10 @@ export class EffectsLayer extends Container {
           cube.destroy();
           // Scoring droplet (drives accounting).
           this.spawnDroplet(cx, cy, target, onLand, false);
-          // A couple of decorative droplets for splashiness.
-          this.spawnDroplet(cx, cy, target, undefined, true);
-          this.spawnDroplet(cx, cy, target, undefined, true);
+          // A few decorative droplets for splashiness (capped for big clears).
+          for (let d = 0; d < decorativePerCell; d++) {
+            this.spawnDroplet(cx, cy, target, undefined, true);
+          }
         },
       });
     });
@@ -207,11 +237,10 @@ export class EffectsLayer extends Container {
     decorative: boolean
   ) {
     const r = decorative ? 2.5 + Math.random() * 2 : 5;
-    const drop = new Graphics();
+    const drop = this.acquireFx();
     drop.circle(0, 0, r).fill({ color: WATER_COLOR });
     drop.circle(-r * 0.3, -r * 0.3, r * 0.4).fill({ color: WATER_HIGHLIGHT, alpha: 0.85 });
     drop.position.set(fromX, fromY);
-    this.addChild(drop);
 
     // Quadratic bezier arc with a control point lifted above the path.
     const cx = (fromX + target.x) / 2 + (Math.random() - 0.5) * 70;
@@ -230,7 +259,7 @@ export class EffectsLayer extends Container {
         drop.alpha = t > 0.85 ? Math.max(0, 1 - (t - 0.85) / 0.15) : 1;
       },
       onDone: () => {
-        drop.destroy();
+        this.releaseFx(drop);
         if (!decorative) this.spawnSplash(target.x, target.y);
         onLand?.();
       },
@@ -239,9 +268,8 @@ export class EffectsLayer extends Container {
 
   /** Small expanding ripple ring where a scoring droplet hits the bar. */
   private spawnSplash(x: number, y: number) {
-    const ring = new Graphics();
+    const ring = this.acquireFx();
     ring.position.set(x, y);
-    this.addChild(ring);
     this.addTween({
       duration: 320,
       ease: easeOutCubic,
@@ -253,7 +281,7 @@ export class EffectsLayer extends Container {
           width: 2,
         });
       },
-      onDone: () => ring.destroy(),
+      onDone: () => this.releaseFx(ring),
     });
   }
 
@@ -303,6 +331,9 @@ export class EffectsLayer extends Container {
       this.rafId = null;
     }
     this.tweens = [];
+    // Pooled (detached) graphics aren't children, so destroy them explicitly.
+    for (const g of this.fxPool) g.destroy();
+    this.fxPool = [];
     super.destroy(options);
   }
 }

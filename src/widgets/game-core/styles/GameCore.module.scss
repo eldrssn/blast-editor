@@ -265,6 +265,13 @@
     transform: translateY(0);
     box-shadow: 0 2px 8px rgba(74, 222, 128, 0.2);
   }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
 }
 
 .overlayButtonSecondary {

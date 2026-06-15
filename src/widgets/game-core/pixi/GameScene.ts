@@ -1,27 +1,23 @@
-import { Container, Graphics, Ticker, Rectangle, FederatedPointerEvent } from "pixi.js";
+import { Container, Ticker, Rectangle } from "pixi.js";
 import {
   LevelConfig,
   BoardCell,
   FigureInstance,
   GameStatus,
   HammerArea,
+  ClearedCellCoord,
 } from "@/entities/game/model/types";
 import { HudLayer } from "./HudLayer";
 import { BoardLayer } from "./BoardLayer";
+import { BackgroundLayer } from "./BackgroundLayer";
 import { FigureLayer, FigurePlacementEvent } from "./FigureLayer";
 import { EffectsLayer } from "./EffectsLayer";
-import { canPlaceFigure, placeFigure, findCompletedLines, clearCompletedLines, canPlaceAnyFigure } from "@/entities/game/lib/board";
-import { calculateScore, checkWinCondition } from "@/entities/game/lib/scoring";
-import { generateFigureSet } from "@/entities/game/lib/figures";
+import { HammerController } from "./HammerController";
+import { canPlaceFigure, placeFigure, findCompletedLines, clearCompletedLines } from "@/entities/game/lib/board";
+import { calculateScore } from "@/entities/game/lib/scoring";
+import { resolvePostMove } from "@/entities/game/lib/gameFlow";
 import { applyCollectAll, applyHammer } from "@/entities/game/lib/boosters";
 import { soundManager } from "@/shared/lib/sound";
-
-/** Wood-tone palettes keyed by LevelConfig.visual.backgroundId. */
-const WOOD_THEMES: Record<string, { base: number; plankA: number; plankB: number; seam: number }> = {
-  wood_classic: { base: 0x3a2412, plankA: 0x4a2f17, plankB: 0x402812, seam: 0x24150a },
-  wood_dark: { base: 0x1a0f07, plankA: 0x2b1a0d, plankB: 0x231408, seam: 0x130b05 },
-  wood_royal: { base: 0x3a1810, plankA: 0x52221a, plankB: 0x451a13, seam: 0x280f0a },
-};
 
 /** Logical canvas dimensions (always rendered at this internal resolution) */
 export const SCENE_W = 450;
@@ -44,7 +40,7 @@ export type GameSceneCallbacks = {
 };
 
 export class GameScene extends Container {
-  private background: Graphics;
+  private background: BackgroundLayer;
   readonly hudLayer: HudLayer;
   readonly boardLayer: BoardLayer;
   readonly figureLayer: FigureLayer;
@@ -55,10 +51,11 @@ export class GameScene extends Container {
   private figures: FigureInstance[] = [];
   private score: number = 0;
   private isMultiplierActive: boolean = false;
+  /** Configured multiplier value (from config.boosters.multiplier), default 2. */
+  private multiplierValue: number = 2;
 
-  /** Hammer booster selection state */
-  private hammerMode: boolean = false;
-  private hammerArea: HammerArea | null = null;
+  /** Hammer booster selection input (block removal stays in this scene). */
+  private hammer: HammerController;
 
   /** Ticker for levitation animation */
   private ticker: Ticker;
@@ -72,6 +69,7 @@ export class GameScene extends Container {
   constructor(config: LevelConfig) {
     super();
     this.config = config;
+    this.multiplierValue = config.boosters?.multiplier?.multiplierValue ?? 2;
     this.effectsEnabled = config.visual?.effectsEnabled !== false;
     soundManager.setEnabled(config.visual?.soundEnabled !== false);
     this.sortableChildren = true;
@@ -82,9 +80,9 @@ export class GameScene extends Container {
     this.hitArea = new Rectangle(0, 0, SCENE_W, SCENE_H);
 
     // --- Background ---
-    this.background = new Graphics();
+    this.background = new BackgroundLayer();
     this.background.zIndex = 0;
-    this.drawBackground();
+    this.background.draw(config, SCENE_W, SCENE_H);
     this.addChild(this.background);
 
     // --- Layers ---
@@ -118,6 +116,21 @@ export class GameScene extends Container {
     this.figureLayer.onPlacementSuccess = () =>
       this.handlePlacementSuccess();
 
+    // --- Hammer booster selection (input only; effect handled below) ---
+    this.hammer = new HammerController({
+      target: this,
+      getGridInfo: () => this.boardLayer.getGridInfo(),
+      getAreaSize: () => ({
+        rows: this.config.boosters?.hammer?.areaRows ?? 4,
+        cols: this.config.boosters?.hammer?.areaCols ?? 4,
+      }),
+      showArea: (area) => this.boardLayer.showHammerArea(area),
+      setFiguresInteractive: (interactive) => {
+        this.figureLayer.eventMode = interactive ? "static" : "none";
+      },
+      onConfirm: (area) => this.applyHammerAt(area),
+    });
+
     // --- Ticker for levitation + HUD animation ---
     this.ticker = new Ticker();
     this.ticker.add((ticker) => {
@@ -128,37 +141,22 @@ export class GameScene extends Container {
     this.ticker.start();
   }
 
-  private drawBackground() {
-    this.background.clear();
-    const theme = WOOD_THEMES[this.config.visual?.backgroundId] ?? WOOD_THEMES.wood_classic;
-
-    // Base fill.
-    this.background.rect(0, 0, SCENE_W, SCENE_H).fill({ color: theme.base });
-
-    // Horizontal wooden planks with a darker seam between each.
-    const plankCount = 7;
-    const plankH = SCENE_H / plankCount;
-    for (let i = 0; i < plankCount; i++) {
-      const y = i * plankH;
-      this.background
-        .rect(0, y, SCENE_W, plankH)
-        .fill({ color: i % 2 === 0 ? theme.plankA : theme.plankB });
-      // Seam line at the top of each plank.
-      this.background.rect(0, y, SCENE_W, 2).fill({ color: theme.seam, alpha: 0.7 });
-
-      // Subtle grain streaks along the plank.
-      for (let s = 0; s < 3; s++) {
-        const gy = y + plankH * (0.25 + s * 0.25);
-        this.background
-          .rect(0, gy, SCENE_W, 1)
-          .fill({ color: theme.seam, alpha: 0.12 });
-      }
-    }
-
-    // Soft vignette: darker top and bottom edges for depth.
-    this.background.rect(0, 0, SCENE_W, 80).fill({ color: 0x000000, alpha: 0.22 });
-    this.background.rect(0, SCENE_H - 120, SCENE_W, 120).fill({ color: 0x000000, alpha: 0.25 });
-    this.background.rect(0, 0, SCENE_W, SCENE_H).fill({ color: 0x000000, alpha: 0.08 });
+  /**
+   * Apply cosmetic / non-structural config changes in place, without rebuilding
+   * the scene or restarting the level: background theme, title, target score,
+   * the multiplier value and the effects/sound toggles. Structural changes
+   * (grid, initial board, figures, booster inventory) still go through a full
+   * rebuild in the React layer.
+   */
+  applyVisualConfig(config: LevelConfig) {
+    this.config = config;
+    this.multiplierValue = config.boosters?.multiplier?.multiplierValue ?? 2;
+    this.effectsEnabled = config.visual?.effectsEnabled !== false;
+    this.figureLayer.effectsEnabled = this.effectsEnabled;
+    this.effectsLayer.effectsEnabled = this.effectsEnabled;
+    soundManager.setEnabled(config.visual?.soundEnabled !== false);
+    this.background.draw(config, SCENE_W, SCENE_H);
+    this.renderState(this.board, this.figures, this.score);
   }
 
   /**
@@ -174,7 +172,7 @@ export class GameScene extends Container {
     }
 
     // HUD
-    this.hudLayer.update(score, this.config.targetScore, this.config.title, SCENE_W, this.isMultiplierActive);
+    this.hudLayer.update(score, this.config.targetScore, this.config.title, SCENE_W, this.isMultiplierActive, this.multiplierValue);
 
     // Board
     this.boardLayer.draw(board, SCENE_W, SCENE_H, HUD_HEIGHT, FigureLayer.slotHeight + 8);
@@ -231,11 +229,6 @@ export class GameScene extends Container {
     soundManager.play("lineClear");
 
     const result = clearCompletedLines(this.board, completedLines);
-    const points = calculateScore({
-      clearedCellsCount: result.clearedCellsCount,
-      clearedLinesCount: result.clearedLinesCount,
-      isMultiplierActive: this.isMultiplierActive,
-    });
 
     // Update the logical board now (cleared cells go empty); the popping cubes
     // are drawn on top by the EffectsLayer so the removal still looks animated.
@@ -243,24 +236,45 @@ export class GameScene extends Container {
     this.callbacks?.onBoardUpdate(this.board);
     this.renderState(this.board, this.figures, this.score);
 
+    // Combo label reflects the number of simultaneously cleared lines.
+    this.awardAndAnimateClear(result, result.clearedLinesCount, () => this.afterClear());
+  }
+
+  /**
+   * Shared clear→score→water-animation routine used by line clears and both
+   * cell-clearing boosters. Computes the score for the cleared cells, flies the
+   * water droplets into the bar, awards the score when the first droplet lands,
+   * and runs `onComplete` once the animation settles.
+   *
+   * `comboCount` only drives the combo label (>= 2 shows "COMBO ×n").
+   */
+  private awardAndAnimateClear(
+    result: { clearedCellsCount: number; clearedLinesCount?: number; clearedCellCoords: ClearedCellCoord[] },
+    comboCount: number,
+    onComplete: () => void
+  ) {
+    const points = calculateScore({
+      clearedCellsCount: result.clearedCellsCount,
+      clearedLinesCount: result.clearedLinesCount ?? 0,
+      isMultiplierActive: this.isMultiplierActive,
+      multiplierValue: this.multiplierValue,
+    });
+
     const target = this.hudLayer.getWaterTargetPoint();
     this.effectsLayer.playLineClear(
       result.clearedCellCoords,
       this.boardLayer.getGridInfo(),
-      result.clearedLinesCount,
+      comboCount,
       target,
       {
         // Award the score the instant the first water droplet lands.
         onScoreArrive: () => {
           this.score += points;
-          this.hudLayer.update(this.score, this.config.targetScore, this.config.title, SCENE_W, this.isMultiplierActive);
+          this.hudLayer.update(this.score, this.config.targetScore, this.config.title, SCENE_W, this.isMultiplierActive, this.multiplierValue);
           this.hudLayer.pulse();
           this.callbacks?.onScoreUpdate(this.score);
         },
-        // Run win / regenerate / lose checks only after the animation settles.
-        onComplete: () => {
-          this.afterClear();
-        },
+        onComplete,
       }
     );
   }
@@ -270,30 +284,22 @@ export class GameScene extends Container {
    * Shared by the cleared-line and no-clear paths.
    */
   private afterClear() {
-    // 1. Win
-    if (checkWinCondition(this.score, this.config.targetScore)) {
-      this.callbacks?.onStatusUpdate("won");
-      this.renderState(this.board, this.figures, this.score);
-      return;
-    }
+    const result = resolvePostMove(this.board, this.figures, this.score, this.config);
 
-    // 2. Regenerate the set once all 3 figures are placed
-    const allPlaced = this.figures.every((f) => f.placed);
-    if (allPlaced) {
-      this.figures = generateFigureSet(this.config);
+    // Apply a freshly generated set (when the previous one was fully placed).
+    if (result.regenerated) {
+      this.figures = result.figures;
       this.callbacks?.onFiguresUpdate(this.figures);
     }
 
-    // 3. Lose condition (no available move). Offer protection from loss when
-    // enabled; otherwise go straight to the lose state.
-    if (!canPlaceAnyFigure(this.board, this.figures)) {
-      const protectionEnabled = this.config.protectionFromLoss?.enabled ?? false;
-      this.callbacks?.onStatusUpdate(protectionEnabled ? "protection_from_loss" : "lost");
-      this.renderState(this.board, this.figures, this.score);
-      return;
+    if (result.outcome === "won") {
+      this.callbacks?.onStatusUpdate("won");
+    } else if (result.outcome === "lost") {
+      this.callbacks?.onStatusUpdate("lost");
+    } else if (result.outcome === "protection") {
+      this.callbacks?.onStatusUpdate("protection_from_loss");
     }
 
-    // 4. Re-render
     this.renderState(this.board, this.figures, this.score);
   }
 
@@ -306,7 +312,7 @@ export class GameScene extends Container {
    * returns false on an empty board — nothing happens and no charge is spent.
    */
   collectAll(): boolean {
-    if (this.hammerMode) return false;
+    if (this.hammer.isActive) return false;
     const hasFilled = this.board.some((row) => row.some((cell) => cell.filled));
     if (!hasFilled) return false;
 
@@ -315,127 +321,29 @@ export class GameScene extends Container {
     this.callbacks?.onBoardUpdate(this.board);
     this.renderState(this.board, this.figures, this.score);
 
-    const points = calculateScore({
-      clearedCellsCount: result.clearedCellsCount,
-      clearedLinesCount: 0,
-      isMultiplierActive: this.isMultiplierActive,
-    });
-
-    const target = this.hudLayer.getWaterTargetPoint();
-    this.effectsLayer.playLineClear(
-      result.clearedCellCoords,
-      this.boardLayer.getGridInfo(),
-      1, // no combo label for boosters
-      target,
-      {
-        onScoreArrive: () => {
-          this.score += points;
-          this.hudLayer.update(this.score, this.config.targetScore, this.config.title, SCENE_W, this.isMultiplierActive);
-          this.hudLayer.pulse();
-          this.callbacks?.onScoreUpdate(this.score);
-        },
-        onComplete: () => {
-          this.afterClear();
-        },
-      }
-    );
+    // comboCount = 1 → no combo label for boosters.
+    this.awardAndAnimateClear(result, 1, () => this.afterClear());
 
     return true;
   }
 
-  /**
-   * Enter the hammer selection mode: a movable 4×4 frame the player positions
-   * over the board. Figures are disabled so pointer moves/taps drive the frame.
-   */
+  /** Enter the hammer selection mode (delegated to HammerController). */
   enterHammerMode() {
-    if (this.hammerMode) return;
-    this.hammerMode = true;
-    this.figureLayer.eventMode = "none";
-
-    this.on("globalpointermove", this.onHammerMove);
-    this.on("pointerdown", this.onHammerDown);
-    this.on("pointerup", this.onHammerUp);
-    this.on("pointerupoutside", this.onHammerUp);
-
-    // Seed the frame at the board centre so something is visible immediately.
-    const info = this.boardLayer.getGridInfo();
-    const cellFull = info.cellSize + info.gap;
-    const cx = info.boardOffsetX + (info.cols * cellFull) / 2;
-    const cy = info.boardOffsetY + (info.rows * cellFull) / 2;
-    this.updateHammerArea(cx, cy);
+    this.hammer.enter();
   }
 
   /** Cancel hammer mode without applying it — no charge is spent. */
   exitHammerMode() {
-    if (!this.hammerMode) return;
-    this.teardownHammer();
-    this.figureLayer.eventMode = "static";
-  }
-
-  /** Remove hammer listeners + overlay and clear the mode flag. */
-  private teardownHammer() {
-    this.off("globalpointermove", this.onHammerMove);
-    this.off("pointerdown", this.onHammerDown);
-    this.off("pointerup", this.onHammerUp);
-    this.off("pointerupoutside", this.onHammerUp);
-    this.boardLayer.showHammerArea(null);
-    this.hammerArea = null;
-    this.hammerMode = false;
-  }
-
-  private onHammerMove = (e: FederatedPointerEvent) => {
-    if (!this.hammerMode) return;
-    const p = this.toLocal(e.global);
-    this.updateHammerArea(p.x, p.y);
-  };
-
-  private onHammerDown = (e: FederatedPointerEvent) => {
-    if (!this.hammerMode) return;
-    const p = this.toLocal(e.global);
-    this.updateHammerArea(p.x, p.y);
-  };
-
-  private onHammerUp = () => {
-    if (!this.hammerMode) return;
-    this.confirmHammer();
-  };
-
-  /** Position the 4×4 frame centred on the given scene-local point, clamped. */
-  private updateHammerArea(localX: number, localY: number) {
-    const info = this.boardLayer.getGridInfo();
-    if (info.cellSize <= 0) return;
-    const cellFull = info.cellSize + info.gap;
-
-    const areaRows = Math.min(this.config.boosters?.hammer?.areaRows ?? 4, info.rows);
-    const areaCols = Math.min(this.config.boosters?.hammer?.areaCols ?? 4, info.cols);
-
-    const pointerCol = Math.floor((localX - info.boardOffsetX) / cellFull);
-    const pointerRow = Math.floor((localY - info.boardOffsetY) / cellFull);
-
-    const clamp = (v: number, max: number) => Math.max(0, Math.min(v, max));
-    const startCol = clamp(pointerCol - Math.floor(areaCols / 2), info.cols - areaCols);
-    const startRow = clamp(pointerRow - Math.floor(areaRows / 2), info.rows - areaRows);
-
-    this.hammerArea = {
-      startRow,
-      startCol,
-      endRow: startRow + areaRows - 1,
-      endCol: startCol + areaCols - 1,
-    };
-    this.boardLayer.showHammerArea(this.hammerArea);
+    this.hammer.cancel();
   }
 
   /**
-   * Apply the hammer at the current frame: remove filled cells inside it and
+   * Apply the hammer at the confirmed area: remove filled cells inside it and
    * award score. A confirm over an area with no filled cells resolves without
-   * spending a charge.
+   * spending a charge. Figures stay disabled until the effect settles.
    */
-  private confirmHammer() {
-    if (!this.hammerMode || !this.hammerArea) return;
-    const area = this.hammerArea;
+  private applyHammerAt(area: HammerArea) {
     const result = applyHammer(this.board, area);
-
-    this.teardownHammer();
 
     if (result.clearedCellsCount === 0) {
       this.figureLayer.eventMode = "static";
@@ -448,32 +356,27 @@ export class GameScene extends Container {
     this.callbacks?.onBoardUpdate(this.board);
     this.renderState(this.board, this.figures, this.score);
 
-    const points = calculateScore({
-      clearedCellsCount: result.clearedCellsCount,
-      clearedLinesCount: 0,
-      isMultiplierActive: this.isMultiplierActive,
+    this.awardAndAnimateClear(result, 1, () => {
+      this.figureLayer.eventMode = "static";
+      this.callbacks?.onHammerComplete(true);
+      this.afterClear();
     });
+  }
 
-    const target = this.hudLayer.getWaterTargetPoint();
-    this.effectsLayer.playLineClear(
-      result.clearedCellCoords,
-      this.boardLayer.getGridInfo(),
-      1,
-      target,
-      {
-        onScoreArrive: () => {
-          this.score += points;
-          this.hudLayer.update(this.score, this.config.targetScore, this.config.title, SCENE_W, this.isMultiplierActive);
-          this.hudLayer.pulse();
-          this.callbacks?.onScoreUpdate(this.score);
-        },
-        onComplete: () => {
-          this.figureLayer.eventMode = "static";
-          this.callbacks?.onHammerComplete(true);
-          this.afterClear();
-        },
-      }
-    );
+  /**
+   * Pause/resume the levitation + HUD + hammer ticker. The scene only needs
+   * per-frame work while the player is actively playing or selecting a booster;
+   * on win/lose/protection overlays nothing animates, so we stop the ticker to
+   * spare weak devices the idle JS work. The HUD score is snapped first so the
+   * counter never freezes mid-animation.
+   */
+  setTickerActive(active: boolean) {
+    if (active) {
+      if (!this.ticker.started) this.ticker.start();
+    } else if (this.ticker.started) {
+      this.hudLayer.snapScore();
+      this.ticker.stop();
+    }
   }
 
   /** Clean up the ticker on destroy */

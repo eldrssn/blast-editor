@@ -90,7 +90,8 @@ export type GameStatus =
 
 export type GameState = {
   status: GameStatus;
-  config: LevelConfig;
+  /** Null until a level is loaded via initGame. */
+  config: LevelConfig | null;
   board: BoardCell[][];
   currentFigures: FigureInstance[];
   score: number;
@@ -110,17 +111,27 @@ export type CompletedLine = {
   index: number;
 };
 
+/** A cleared cell snapshot used to animate pops + water droplets. */
+export type ClearedCellCoord = {
+  row: number;
+  col: number;
+  color?: string;
+  hasWater?: boolean;
+};
+
 export type ClearResult = {
   board: BoardCell[][];
   clearedCellsCount: number;
   clearedLinesCount: number;
-  clearedCellCoords: Array<{ row: number; col: number; color?: string; hasWater?: boolean }>;
+  clearedCellCoords: ClearedCellCoord[];
 };
 
 export type CalculateScoreParams = {
   clearedCellsCount: number;
   clearedLinesCount: number;
   isMultiplierActive: boolean;
+  /** Configured multiplier value applied while the booster is active (default 2). */
+  multiplierValue?: number;
 };
 
 export type HammerArea = {

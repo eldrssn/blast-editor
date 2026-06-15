@@ -7,6 +7,7 @@ export class GameApplication {
   private scene: GameScene | null = null;
   private container: HTMLDivElement;
   private resizeObserver: ResizeObserver;
+  private resizeRaf: number | null = null;
   private _destroyed = false;
 
   /** External callbacks for state changes from Pixi -> React */
@@ -15,8 +16,17 @@ export class GameApplication {
   constructor(container: HTMLDivElement) {
     this.container = container;
     this.app = new Application();
-    this.resizeObserver = new ResizeObserver(() => this.handleResize());
+    this.resizeObserver = new ResizeObserver(this.scheduleResize);
   }
+
+  /** Coalesce bursts of resize events into a single per-frame layout pass. */
+  private scheduleResize = () => {
+    if (this.resizeRaf !== null || this._destroyed) return;
+    this.resizeRaf = requestAnimationFrame(() => {
+      this.resizeRaf = null;
+      this.handleResize();
+    });
+  };
 
   async init(config: LevelConfig): Promise<void> {
     if (this._destroyed) return;
@@ -25,12 +35,19 @@ export class GameApplication {
     const w = clientWidth || SCENE_W;
     const h = clientHeight || SCENE_H;
 
+    // Cap the device pixel ratio: a DPR-3 phone would otherwise render 9× the
+    // pixels of a logical one. 2 stays crisp while keeping the fill rate sane on
+    // weak GPUs. Antialias is tied to the effects toggle so the low-end profile
+    // (effects off) also drops MSAA.
+    const resolution = Math.min(window.devicePixelRatio || 1, 2);
+    const antialias = config.visual?.effectsEnabled !== false;
+
     await this.app.init({
       width: w,
       height: h,
       backgroundColor: 0x1a0f07,
-      antialias: true,
-      resolution: window.devicePixelRatio || 1,
+      antialias,
+      resolution,
       autoDensity: true,
     });
 
@@ -99,9 +116,23 @@ export class GameApplication {
     this.scene?.exitHammerMode();
   }
 
+  /** Pause/resume the scene's idle animation ticker (driven by game status). */
+  setTickerActive(active: boolean) {
+    this.scene?.setTickerActive(active);
+  }
+
+  /** Apply cosmetic config changes in place (no rebuild / no level restart). */
+  applyVisualConfig(config: LevelConfig) {
+    this.scene?.applyVisualConfig(config);
+  }
+
   destroy() {
     this._destroyed = true;
     this.resizeObserver.disconnect();
+    if (this.resizeRaf !== null) {
+      cancelAnimationFrame(this.resizeRaf);
+      this.resizeRaf = null;
+    }
     if (this.scene) {
       this.scene.destroy({ children: true });
       this.scene = null;

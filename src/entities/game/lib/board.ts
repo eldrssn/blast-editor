@@ -1,4 +1,4 @@
-import { BoardCell, BoardCellConfig, FigureInstance, CompletedLine, ClearResult } from "../model/types";
+import { BoardCell, BoardCellConfig, FigureInstance, CompletedLine, ClearResult, ClearedCellCoord } from "../model/types";
 
 /**
  * Creates an empty board of size rows x cols, incorporating any pre-filled cells from the initial board configuration.
@@ -134,7 +134,7 @@ export function clearCompletedLines(board: BoardCell[][], lines: CompletedLine[]
     }
   }
 
-  const clearedCellCoords: Array<{ row: number; col: number; color?: string; hasWater?: boolean }> = [];
+  const clearedCellCoords: ClearedCellCoord[] = [];
   const newBoard = board.map((row, rowIdx) =>
     row.map((cell, colIdx) => {
       if (cellsToClear.has(`${rowIdx}-${colIdx}`)) {

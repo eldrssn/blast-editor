@@ -5,15 +5,11 @@ import { generateFigureSet } from "@/entities/game/lib/figures";
 
 export type GameStoreState = GameState & {
   initGame: (config: LevelConfig) => void;
-  resetGame: () => void;
   setStatus: (status: GameStatus) => void;
   setBoard: (board: BoardCell[][]) => void;
   setCurrentFigures: (figures: FigureInstance[]) => void;
   setScore: (score: number) => void;
-  addScore: (points: number) => void;
-  setIsMultiplierActive: (active: boolean) => void;
   setActiveBooster: (booster: BoosterType | null) => void;
-  setBoosterInventory: (inventory: Record<BoosterType, number>) => void;
   useBooster: (booster: BoosterType) => void;
   /**
    * Activate the multiplier booster. Idempotent: if it is already active or out
@@ -21,10 +17,6 @@ export type GameStoreState = GameState & {
    * never corrupts the state or wastes a charge.
    */
   activateMultiplier: () => void;
-  /** Mark a figure as placed by uid */
-  markFigurePlaced: (uid: string) => void;
-  /** Replace current figures with a new set */
-  regenerateFigures: () => void;
   /**
    * Protection-from-loss clear: wipe the whole board and resume play.
    * No score is awarded for a protection clear (per level rules).
@@ -34,7 +26,7 @@ export type GameStoreState = GameState & {
 
 const defaultState: GameState = {
   status: "idle",
-  config: null as unknown as LevelConfig,
+  config: null,
   board: [],
   currentFigures: [],
   score: 0,
@@ -53,7 +45,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   initGame: (config: LevelConfig) => {
     const board = createEmptyBoard(config.grid.rows, config.grid.cols, config.initialBoard);
-    const currentFigures = generateFigureSet(config);
+    const currentFigures = generateFigureSet(config, board);
 
     set({
       status: "playing",
@@ -72,13 +64,6 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     });
   },
 
-  resetGame: () => {
-    const { config } = get();
-    if (config) {
-      get().initGame(config);
-    }
-  },
-
   setStatus: (status: GameStatus) => set({ status }),
 
   setBoard: (board: BoardCell[][]) => set({ board }),
@@ -87,13 +72,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   setScore: (score: number) => set({ score }),
 
-  addScore: (points: number) => set((state) => ({ score: state.score + points })),
-
-  setIsMultiplierActive: (isMultiplierActive: boolean) => set({ isMultiplierActive }),
-
   setActiveBooster: (activeBooster: BoosterType | null) => set({ activeBooster }),
-
-  setBoosterInventory: (boosterInventory: Record<BoosterType, number>) => set({ boosterInventory }),
 
   useBooster: (booster: BoosterType) => {
     const { boosterInventory } = get();
@@ -121,24 +100,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     });
   },
 
-  markFigurePlaced: (uid: string) => {
-    const { currentFigures } = get();
-    set({
-      currentFigures: currentFigures.map((f) =>
-        f.uid === uid ? { ...f, placed: true } : f
-      ),
-    });
-  },
-
-  regenerateFigures: () => {
-    const { config } = get();
-    if (config) {
-      set({ currentFigures: generateFigureSet(config) });
-    }
-  },
-
   clearBoardAndContinue: () => {
-    const { config, currentFigures } = get();
+    const { config, currentFigures, score } = get();
     if (!config) return;
 
     // Fully empty board — protection clear wipes obstacles too.
@@ -147,9 +110,14 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     // Any figures still unplaced now fit on the empty board, but if the whole
     // set was already placed we generate a fresh one so the player can keep going.
     const figures = currentFigures.every((f) => f.placed)
-      ? generateFigureSet(config)
+      ? generateFigureSet(config, board)
       : currentFigures;
 
-    set({ board, currentFigures: figures, status: "playing" });
+    // Spend the configured cost in water/score (clamped at 0). A cost of 0 makes
+    // the protection clear free, per level rules.
+    const cost = config.protectionFromLoss?.clearBoardCost ?? 0;
+    const nextScore = Math.max(0, score - cost);
+
+    set({ board, currentFigures: figures, status: "playing", score: nextScore });
   },
 }));

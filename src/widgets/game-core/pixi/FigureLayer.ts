@@ -1,6 +1,6 @@
 import { Container, Graphics, FederatedPointerEvent } from "pixi.js";
 import { FigureInstance, GridPosition } from "@/entities/game/model/types";
-import { drawPseudo3DCube } from "./BoardLayer";
+import { drawPseudo3DCube } from "./cube";
 import { soundManager } from "@/shared/lib/sound";
 
 const SLOT_COUNT = 3;
@@ -51,6 +51,11 @@ export class FigureLayer extends Container {
   /** Levitation animation */
   private levitationPhases: number[] = [];
   private animationFrame: number = 0;
+
+  /** Active rAF ids for bounce/return animations, cancelled on destroy. */
+  private rafIds = new Set<number>();
+  /** Guards animation callbacks from touching the layer after teardown. */
+  private isDestroyed = false;
 
   /** When false, idle levitation + bounce are skipped (visual.effectsEnabled). */
   effectsEnabled: boolean = true;
@@ -128,10 +133,9 @@ export class FigureLayer extends Container {
         width: 1,
       });
 
-      // Remove old figure graphics (children after bg)
-      while (slot.children.length > 1) {
-        slot.removeChildAt(1);
-      }
+      // Remove old figure graphics (children after bg) and free their GPU
+      // resources — removeChild alone leaves geometry around until GC.
+      this.clearSlotFigure(slot);
 
       const figure = figures[i];
       if (!figure || figure.placed) continue;
@@ -394,14 +398,33 @@ export class FigureLayer extends Container {
   }
 
   private redrawSlotWithoutFigure(figureIndex: number) {
-    const slot = this.slotContainers[figureIndex];
-    // Remove figure graphics but keep bg
+    // Remove figure graphics but keep bg (child 0).
+    this.clearSlotFigure(this.slotContainers[figureIndex]);
+  }
+
+  /** Remove + destroy every child of a slot except its background (index 0). */
+  private clearSlotFigure(slot: Container) {
     while (slot.children.length > 1) {
-      slot.removeChildAt(1);
+      const child = slot.children[slot.children.length - 1];
+      slot.removeChild(child);
+      child.destroy({ children: true });
     }
   }
 
   // ─── Animations ──────────────────────────────────────────────
+
+  /**
+   * requestAnimationFrame wrapper that tracks the pending id so it can be
+   * cancelled in destroy(), and skips the callback if the layer is gone.
+   */
+  private scheduleRaf(cb: () => void) {
+    const id = requestAnimationFrame(() => {
+      this.rafIds.delete(id);
+      if (this.isDestroyed) return;
+      cb();
+    });
+    this.rafIds.add(id);
+  }
 
   private playBounceAnimation(container: Container, onComplete: () => void) {
     const originalScale = container.scale.x;
@@ -425,13 +448,13 @@ export class FigureLayer extends Container {
       }
 
       if (t < 1) {
-        requestAnimationFrame(animate);
+        this.scheduleRaf(animate);
       } else {
         container.scale.set(originalScale);
         onComplete();
       }
     };
-    requestAnimationFrame(animate);
+    this.scheduleRaf(animate);
   }
 
   private animateReturnToSlot(
@@ -465,16 +488,24 @@ export class FigureLayer extends Container {
       container.alpha = 0.9 + 0.1 * ease;
 
       if (t < 1) {
-        requestAnimationFrame(animate);
+        this.scheduleRaf(animate);
       } else {
         onComplete();
       }
     };
-    requestAnimationFrame(animate);
+    this.scheduleRaf(animate);
   }
 
   /** Returns bottom slot height so GameScene can account for it */
   static get slotHeight() {
     return SLOT_HEIGHT;
+  }
+
+  /** Cancel any in-flight bounce/return animations and free resources. */
+  override destroy(options?: Parameters<typeof Container.prototype.destroy>[0]) {
+    this.isDestroyed = true;
+    for (const id of this.rafIds) cancelAnimationFrame(id);
+    this.rafIds.clear();
+    super.destroy(options);
   }
 }

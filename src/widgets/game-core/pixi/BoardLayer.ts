@@ -1,92 +1,17 @@
 import { Container, Graphics } from "pixi.js";
 import { BoardCell, FigureInstance, GridPosition, HammerArea } from "@/entities/game/model/types";
+import { CORNER_RADIUS } from "./cube";
+import { getCubeContext } from "./cubeContext";
 
-/** Vertical depth offset for pseudo-3D face */
-const DEPTH = 5;
-/** Corner radius for rounded blocks */
-const CORNER_RADIUS = 5;
 /** Gap between cells */
 const GAP = 2;
 
-/**
- * Draws a pseudo-3D cube inside the given graphics at position (x, y)
- * with dimensions (size x size).
- * The cube has: top face, right dark face, bottom dark face, and a small highlight.
- */
-/** Scale a hex color channel-wise. factor<1 darkens, factor>1 lightens (clamped). */
-function scaleColor(hex: string, factor: number): string {
-  const n = parseInt(hex.replace("#", ""), 16);
-  const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
-  const r = clamp(((n >> 16) & 0xff) * factor);
-  const gb = clamp(((n >> 8) & 0xff) * factor);
-  const b = clamp((n & 0xff) * factor);
-  return `#${r.toString(16).padStart(2, "0")}${gb.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
-}
-
-export function drawPseudo3DCube(
-  g: Graphics,
-  x: number,
-  y: number,
-  size: number,
-  color: string,
-  alpha = 1
-) {
-  const sideColor = scaleColor(color, 0.55);
-  const bottomColor = scaleColor(color, 0.42);
-  const topColor = scaleColor(color, 1.18); // lighter top band for a gradient feel
-
-  // Soft drop shadow beneath the block (offset + slightly larger for diffusion).
-  g.roundRect(x + DEPTH + 1, y + DEPTH + 2, size, size, CORNER_RADIUS).fill({
-    color: 0x000000,
-    alpha: 0.28 * alpha,
-  });
-
-  // Right face (dark side)
-  g.poly([
-    { x: x + size, y: y + CORNER_RADIUS },
-    { x: x + size + DEPTH, y: y + CORNER_RADIUS + DEPTH },
-    { x: x + size + DEPTH, y: y + size + DEPTH },
-    { x: x + size, y: y + size },
-  ]).fill({ color: sideColor, alpha });
-
-  // Bottom face (darkest side)
-  g.poly([
-    { x: x + CORNER_RADIUS, y: y + size },
-    { x: x + CORNER_RADIUS + DEPTH, y: y + size + DEPTH },
-    { x: x + size + DEPTH, y: y + size + DEPTH },
-    { x: x + size, y: y + size },
-  ]).fill({ color: bottomColor, alpha });
-
-  // Main top face
-  g.roundRect(x, y, size, size, CORNER_RADIUS).fill({ color, alpha });
-
-  // Vertical gradient: a lighter band fading down the top half.
-  g.roundRect(x, y, size, size * 0.5, CORNER_RADIUS).fill({
-    color: topColor,
-    alpha: 0.5 * alpha,
-  });
-
-  // Inner bevel rim (dark) for crisp edge definition.
-  g.roundRect(x + 0.5, y + 0.5, size - 1, size - 1, CORNER_RADIUS).stroke({
-    color: scaleColor(color, 0.35),
-    alpha: 0.5 * alpha,
-    width: 1,
-  });
-
-  // Glossy highlight (top-left corner).
-  g.roundRect(x + size * 0.12, y + size * 0.1, size * 0.5, size * 0.2, 3).fill({
-    color: 0xffffff,
-    alpha: 0.42 * alpha,
-  });
-  // Tiny sparkle dot.
-  g.circle(x + size * 0.72, y + size * 0.24, Math.max(size * 0.04, 1)).fill({
-    color: 0xffffff,
-    alpha: 0.5 * alpha,
-  });
-}
-
 export class BoardLayer extends Container {
+  /** Empty-cell insets (cheap, redrawn each pass). */
   private gridGraphics: Graphics;
+  /** Pooled cube graphics for filled cells (share cached contexts). */
+  private cubeLayer: Container;
+  private cubePool: Graphics[] = [];
   private highlightGraphics: Graphics;
   private cellSize: number = 0;
   private boardOffsetX: number = 0;
@@ -103,6 +28,10 @@ export class BoardLayer extends Container {
     super();
     this.gridGraphics = new Graphics();
     this.addChild(this.gridGraphics);
+
+    // Cubes sit above the empty-cell insets and below the highlight overlay.
+    this.cubeLayer = new Container();
+    this.addChild(this.cubeLayer);
 
     this.highlightGraphics = new Graphics();
     this.highlightGraphics.zIndex = 10;
@@ -142,6 +71,10 @@ export class BoardLayer extends Container {
 
     this.gridGraphics.clear();
 
+    // Filled cells reuse pooled cube graphics backed by cached contexts, so the
+    // (relatively expensive) cube geometry is tessellated once per color/size
+    // and only the cheap empty-cell insets are re-drawn each pass.
+    let cubeIndex = 0;
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         const px = this.boardOffsetX + c * cellFull;
@@ -149,13 +82,10 @@ export class BoardLayer extends Container {
         const cell = board[r]?.[c];
 
         if (cell?.filled && cell.color) {
-          drawPseudo3DCube(
-            this.gridGraphics,
-            px,
-            py,
-            this.cellSize,
-            cell.color
-          );
+          const cube = this.acquireCube(cubeIndex++);
+          cube.context = getCubeContext(cell.color, this.cellSize);
+          cube.position.set(px, py);
+          cube.visible = true;
         } else {
           // Empty cell – subtle inset tile
           this.gridGraphics
@@ -168,8 +98,24 @@ export class BoardLayer extends Container {
       }
     }
 
+    // Hide any pooled cubes left over from a fuller board.
+    for (let i = cubeIndex; i < this.cubePool.length; i++) {
+      this.cubePool[i].visible = false;
+    }
+
     // Clear any leftover highlight
     this.highlightGraphics.clear();
+  }
+
+  /** Get (or lazily create) a pooled cube graphics by index. */
+  private acquireCube(index: number): Graphics {
+    let cube = this.cubePool[index];
+    if (!cube) {
+      cube = new Graphics();
+      this.cubePool[index] = cube;
+      this.cubeLayer.addChild(cube);
+    }
+    return cube;
   }
 
   /**

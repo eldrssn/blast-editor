@@ -12,8 +12,10 @@ export class HudLayer extends Container {
   private scoreText: Text;
   private titleText: Text;
   private multiplierBadge: Text;
-  /** Whether the multiplier booster is active (drives the x2 badge + glow). */
+  /** Whether the multiplier booster is active (drives the badge + glow). */
   private _multiplierActive: boolean = false;
+  /** Configured multiplier value shown on the badge (e.g. ×2, ×3). */
+  private _multiplierValue: number = 2;
   private _targetScore: number = 0;
   /** Actual logical score (animation target). */
   private _score: number = 0;
@@ -76,12 +78,13 @@ export class HudLayer extends Container {
     this.addChild(this.multiplierBadge);
   }
 
-  update(score: number, targetScore: number, title: string, containerWidth: number, isMultiplierActive = false) {
+  update(score: number, targetScore: number, title: string, containerWidth: number, isMultiplierActive = false, multiplierValue = 2) {
     this._score = score;
     this._targetScore = targetScore;
     this._title = title;
     this._width = containerWidth;
     this._multiplierActive = isMultiplierActive;
+    this._multiplierValue = multiplierValue;
 
     // Snap on the first render or whenever the score drops (reset / new level),
     // so the counter only animates upward during play.
@@ -128,6 +131,16 @@ export class HudLayer extends Container {
   /** Trigger a glow pulse on the progress bar (call when water arrives). */
   pulse() {
     this._pulse = PULSE_MS;
+  }
+
+  /**
+   * Snap the displayed score to its target and drop the pulse. Called before the
+   * ticker is paused (overlays) so the counter never freezes mid-animation.
+   */
+  snapScore() {
+    this._displayScore = this._score;
+    this._pulse = 0;
+    this.redraw();
   }
 
   /**
@@ -203,9 +216,11 @@ export class HudLayer extends Container {
     this.titleText.x = this._width / 2;
     this.titleText.y = 14;
 
-    // "×2" badge under the bar while the multiplier is active
+    // "×N" badge under the bar while the multiplier is active
     this.multiplierBadge.visible = this._multiplierActive;
     if (this._multiplierActive) {
+      // Trim trailing ".0" so ×2 stays "×2" but ×1.5 reads "×1.5".
+      this.multiplierBadge.text = `×${Number(this._multiplierValue.toFixed(2))}`;
       this.multiplierBadge.anchor.set(1, 0);
       this.multiplierBadge.x = BAR_X + barW;
       this.multiplierBadge.y = BAR_Y + BAR_H + 3;

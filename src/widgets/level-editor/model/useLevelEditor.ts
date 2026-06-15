@@ -1,0 +1,148 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LevelConfig } from "@/entities/game/model/types";
+import { DEFAULT_LEVELS } from "@/entities/game/config/defaultLevels";
+import { normalizeLevelConfig } from "@/entities/game/model/normalize";
+import { validateLevelConfig } from "@/entities/game/model/validation";
+
+/**
+ * State + handlers for the level editor, kept out of the LevelEditor view so the
+ * widget only wires data into the form/preview. Owns the edited config, the
+ * applied config (what the preview runs), the raw JSON mirror and the selected
+ * template, plus all the apply/reset/import/export transitions between them.
+ */
+export function useLevelEditor() {
+  const initialLevel = DEFAULT_LEVELS[0];
+  const [editConfig, setEditConfig] = useState<LevelConfig>(() => normalizeLevelConfig(initialLevel));
+  const [appliedConfig, setAppliedConfig] = useState<LevelConfig>(() => normalizeLevelConfig(initialLevel));
+  const [jsonText, setJsonText] = useState<string>(() => JSON.stringify(normalizeLevelConfig(initialLevel), null, 2));
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(initialLevel.levelId);
+  const [jsonError, setJsonError] = useState<string | null>(null);
+
+  // Lightweight inline toast (replaces blocking alert() calls).
+  const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const notify = useCallback((type: "success" | "error", text: string) => {
+    setToast({ type, text });
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2600);
+  }, []);
+
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+  }, []);
+
+  // Validation is a pure function of the edited config — derive it during render
+  // instead of mirroring it into state via an effect (avoids cascading renders).
+  const validationErrors = useMemo(() => validateLevelConfig(editConfig), [editConfig]);
+
+  // Apply a new config from the form/template/import and re-sync the textarea.
+  // (JSON typed by hand uses setEditConfig directly so the raw text isn't reformatted.)
+  const applyEditConfig = (cfg: LevelConfig) => {
+    setEditConfig(cfg);
+    setJsonText(JSON.stringify(cfg, null, 2));
+  };
+
+  const handleTemplateChange = (id: string) => {
+    setSelectedTemplateId(id);
+    if (id === "custom") return;
+
+    const template = DEFAULT_LEVELS.find((l) => l.levelId === id);
+    if (template) {
+      const normalized = normalizeLevelConfig(template);
+      applyEditConfig(normalized);
+      setAppliedConfig(normalized);
+    }
+  };
+
+  const handleConfigChange = (newConfig: LevelConfig) => {
+    applyEditConfig(newConfig);
+  };
+
+  const handleApply = () => {
+    if (validationErrors.length === 0) {
+      setAppliedConfig(structuredClone(editConfig));
+      notify("success", "Конфигурация применена к игре");
+    } else {
+      notify("error", "Проверьте ошибки валидации конфигурации");
+    }
+  };
+
+  const handleReset = () => {
+    if (selectedTemplateId !== "custom") {
+      const template = DEFAULT_LEVELS.find((l) => l.levelId === selectedTemplateId);
+      if (template) {
+        const normalized = normalizeLevelConfig(template);
+        applyEditConfig(normalized);
+        setAppliedConfig(normalized);
+      }
+    } else {
+      const normalized = normalizeLevelConfig(initialLevel);
+      applyEditConfig(normalized);
+      setAppliedConfig(normalized);
+      setSelectedTemplateId(initialLevel.levelId);
+    }
+  };
+
+  const handleCopyJson = () => {
+    navigator.clipboard.writeText(JSON.stringify(editConfig, null, 2))
+      .then(() => notify("success", "JSON скопирован в буфер обмена"))
+      .catch(() => notify("error", "Не удалось скопировать JSON"));
+  };
+
+  const handleImportJson = (text: string) => {
+    try {
+      const parsed = JSON.parse(text);
+      const normalized = normalizeLevelConfig(parsed);
+      const errors = validateLevelConfig(normalized);
+
+      setJsonError(null);
+      applyEditConfig(normalized);
+
+      if (errors.length === 0) {
+        setAppliedConfig(normalized);
+        setSelectedTemplateId("custom");
+        notify("success", "Конфигурация импортирована");
+      } else {
+        notify("error", "Импортировано, но есть ошибки валидации");
+      }
+    } catch (e) {
+      const message = "Ошибка при парсинге JSON: " + (e as Error).message;
+      setJsonError(message);
+      notify("error", "Невалидный JSON");
+    }
+  };
+
+  const handleJsonChange = (text: string) => {
+    setJsonText(text);
+    try {
+      const parsed = JSON.parse(text);
+      const normalized = normalizeLevelConfig(parsed);
+      setJsonError(null);
+      // Keep the raw text the user is typing — only update the parsed config.
+      setEditConfig(normalized);
+    } catch (e) {
+      // Invalid JSON syntax: keep the raw text, surface the error, don't touch config.
+      setJsonError((e as Error).message);
+    }
+  };
+
+  return {
+    editConfig,
+    appliedConfig,
+    jsonText,
+    jsonError,
+    selectedTemplateId,
+    validationErrors,
+    toast,
+    handleConfigChange,
+    handleApply,
+    handleReset,
+    handleCopyJson,
+    handleImportJson,
+    handleJsonChange,
+    handleTemplateChange,
+  };
+}

@@ -218,29 +218,33 @@ const RECIPES: Record<SoundName, () => Float32Array> = {
 class SoundManager {
   private howls: Partial<Record<SoundName, Howl>> = {};
   private enabled = true;
-  private built = false;
 
   setEnabled(enabled: boolean) {
     this.enabled = enabled;
   }
 
-  /** Synthesize + register every Howl. Safe to call repeatedly (no-ops after first). */
-  private ensureBuilt() {
-    if (this.built || typeof window === "undefined") return;
-    (Object.keys(RECIPES) as SoundName[]).forEach((name) => {
-      this.howls[name] = new Howl({
+  /**
+   * Synthesize + register a single Howl on first use. Building one short tone at
+   * a time keeps the very first `pick` from synthesizing all seven sounds on the
+   * pointer thread (a noticeable hitch on weak devices).
+   */
+  private ensure(name: SoundName): Howl | undefined {
+    if (typeof window === "undefined") return undefined;
+    let howl = this.howls[name];
+    if (!howl) {
+      howl = new Howl({
         src: [toWavDataUri(RECIPES[name]())],
         format: ["wav"],
         volume: 0.8,
       });
-    });
-    this.built = true;
+      this.howls[name] = howl;
+    }
+    return howl;
   }
 
   play(name: SoundName) {
     if (!this.enabled || typeof window === "undefined") return;
-    this.ensureBuilt();
-    this.howls[name]?.play();
+    this.ensure(name)?.play();
   }
 }
 
