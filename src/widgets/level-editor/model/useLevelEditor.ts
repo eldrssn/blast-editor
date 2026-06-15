@@ -12,12 +12,21 @@ import { validateLevelConfig } from "@/entities/game/model/validation";
  * applied config (what the preview runs), the raw JSON mirror and the selected
  * template, plus all the apply/reset/import/export transitions between them.
  */
-export function useLevelEditor() {
-  const initialLevel = DEFAULT_LEVELS[0];
-  const [editConfig, setEditConfig] = useState<LevelConfig>(() => normalizeLevelConfig(initialLevel));
-  const [appliedConfig, setAppliedConfig] = useState<LevelConfig>(() => normalizeLevelConfig(initialLevel));
-  const [jsonText, setJsonText] = useState<string>(() => JSON.stringify(normalizeLevelConfig(initialLevel), null, 2));
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(initialLevel.levelId);
+function getTemplateSelectionId(levelId: string) {
+  return DEFAULT_LEVELS.some((level) => level.levelId === levelId) ? levelId : "custom";
+}
+
+export function useLevelEditor(initialLevel: LevelConfig = DEFAULT_LEVELS[0]) {
+  const normalizedInitialLevel = useMemo(
+    () => normalizeLevelConfig(initialLevel),
+    [initialLevel]
+  );
+  const [editConfig, setEditConfig] = useState<LevelConfig>(normalizedInitialLevel);
+  const [appliedConfig, setAppliedConfig] = useState<LevelConfig>(normalizedInitialLevel);
+  const [jsonText, setJsonText] = useState<string>(() => JSON.stringify(normalizedInitialLevel, null, 2));
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(
+    getTemplateSelectionId(normalizedInitialLevel.levelId)
+  );
   const [jsonError, setJsonError] = useState<string | null>(null);
 
   // Lightweight inline toast (replaces blocking alert() calls).
@@ -53,7 +62,7 @@ export function useLevelEditor() {
     if (template) {
       const normalized = normalizeLevelConfig(template);
       applyEditConfig(normalized);
-      setAppliedConfig(normalized);
+      setJsonError(null);
     }
   };
 
@@ -65,25 +74,18 @@ export function useLevelEditor() {
     if (validationErrors.length === 0) {
       setAppliedConfig(structuredClone(editConfig));
       notify("success", "Конфигурация применена к игре");
-    } else {
-      notify("error", "Проверьте ошибки валидации конфигурации");
+      return true;
     }
+
+    notify("error", "Проверьте ошибки валидации конфигурации");
+    return false;
   };
 
   const handleReset = () => {
-    if (selectedTemplateId !== "custom") {
-      const template = DEFAULT_LEVELS.find((l) => l.levelId === selectedTemplateId);
-      if (template) {
-        const normalized = normalizeLevelConfig(template);
-        applyEditConfig(normalized);
-        setAppliedConfig(normalized);
-      }
-    } else {
-      const normalized = normalizeLevelConfig(initialLevel);
-      applyEditConfig(normalized);
-      setAppliedConfig(normalized);
-      setSelectedTemplateId(initialLevel.levelId);
-    }
+    const restoredConfig = structuredClone(appliedConfig);
+    applyEditConfig(restoredConfig);
+    setSelectedTemplateId(getTemplateSelectionId(restoredConfig.levelId));
+    setJsonError(null);
   };
 
   const handleCopyJson = () => {
@@ -99,12 +101,11 @@ export function useLevelEditor() {
       const errors = validateLevelConfig(normalized);
 
       setJsonError(null);
+      setSelectedTemplateId("custom");
       applyEditConfig(normalized);
 
       if (errors.length === 0) {
-        setAppliedConfig(normalized);
-        setSelectedTemplateId("custom");
-        notify("success", "Конфигурация импортирована");
+        notify("success", "Конфигурация импортирована в редактор");
       } else {
         notify("error", "Импортировано, но есть ошибки валидации");
       }

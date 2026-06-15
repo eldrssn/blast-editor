@@ -125,6 +125,8 @@ export class GameApplication {
   }
 
   destroy() {
+    if (this._destroyed) return;
+
     this._destroyed = true;
     this.resizeObserver.disconnect();
     if (this.resizeRaf !== null) {
@@ -135,7 +137,7 @@ export class GameApplication {
       this.scene.destroy({ children: true });
       this.scene = null;
     }
-    this.app.destroy(true, { children: true });
+    this.app.destroy({ removeView: true }, { children: true });
     // Remove canvas from DOM
     const canvas = this.container.querySelector("canvas");
     canvas?.remove();

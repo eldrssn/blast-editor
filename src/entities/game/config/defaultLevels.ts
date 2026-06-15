@@ -176,14 +176,14 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     visual: { backgroundId: "wood_dark", cubeStyle: "pseudo3d", showDebugGrid: false }
   },
 
-  // ─── Lvl 6: средний, сетка 9×9, заняты углы ───────────────────────
+  // ─── Lvl 6: средний, 8×8, заняты углы ─────────────────────────────
   {
     levelId: "level_6",
-    grid: { rows: 9, cols: 9 },
+    grid: { rows: 8, cols: 8 },
     targetScore: 160,
-    initialBoard: paintBoard(9, 9, (set) => {
-      set(0, 0, ROSE); set(0, 8, AMBER);
-      set(8, 0, COBALT); set(8, 8, PURPLE);
+    initialBoard: paintBoard(8, 8, (set) => {
+      set(0, 0, ROSE); set(0, 7, AMBER);
+      set(7, 0, COBALT); set(7, 7, PURPLE);
     }),
     figures: {
       availableShapeIds: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"],
@@ -244,13 +244,13 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     visual: { backgroundId: "wood_dark", cubeStyle: "pseudo3d", showDebugGrid: false }
   },
 
-  // ─── Lvl 9: сложный, 9×9, только крупные фигуры, маркеры краёв ─────
+  // ─── Lvl 9: сложный, 8×8, только крупные фигуры, маркеры краёв ─────
   {
     levelId: "level_9",
-    grid: { rows: 9, cols: 9 },
+    grid: { rows: 8, cols: 8 },
     targetScore: 240,
-    initialBoard: paintBoard(9, 9, (set) => {
-      for (const c of [0, 4, 8]) { set(0, c, COBALT); set(8, c, COBALT); }
+    initialBoard: paintBoard(8, 8, (set) => {
+      for (const c of [0, 4, 7]) { set(0, c, COBALT); set(7, c, COBALT); }
     }),
     figures: {
       availableShapeIds: ["3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"],
@@ -289,13 +289,13 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     visual: { backgroundId: "wood_classic", cubeStyle: "pseudo3d", showDebugGrid: false }
   },
 
-  // ─── Lvl 11: сложный, 9×9, диагональ-препятствие, упор на ×3 ───────
+  // ─── Lvl 11: сложный, 8×8, диагональ-препятствие, упор на ×3 ───────
   {
     levelId: "level_11",
-    grid: { rows: 9, cols: 9 },
+    grid: { rows: 8, cols: 8 },
     targetScore: 300,
-    initialBoard: paintBoard(9, 9, (set) => {
-      for (let i = 0; i < 9; i++) set(i, i, ROSE);
+    initialBoard: paintBoard(8, 8, (set) => {
+      for (let i = 0; i < 8; i++) set(i, i, ROSE);
     }),
     figures: {
       availableShapeIds: ["4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"],
@@ -311,14 +311,14 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     visual: { backgroundId: "wood_dark", cubeStyle: "pseudo3d", showDebugGrid: false }
   },
 
-  // ─── Lvl 12: сложный, большое поле 10×10, рассыпанные блоки ────────
+  // ─── Lvl 12: сложный, 8×8, рассыпанные блоки ───────────────────────
   {
     levelId: "level_12",
-    grid: { rows: 10, cols: 10 },
+    grid: { rows: 8, cols: 8 },
     targetScore: 360,
-    initialBoard: paintBoard(10, 10, (set) => {
-      for (let r = 1; r < 10; r += 3) {
-        for (let c = 1; c < 10; c += 3) set(r, c, EMERALD);
+    initialBoard: paintBoard(8, 8, (set) => {
+      for (let r = 1; r < 8; r += 3) {
+        for (let c = 1; c < 8; c += 3) set(r, c, EMERALD);
       }
     }),
     figures: {
@@ -335,12 +335,12 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     visual: { backgroundId: "wood_royal", cubeStyle: "pseudo3d", showDebugGrid: false }
   },
 
-  // ─── Lvl 13: очень сложный, тесное 7×7, только крупные фигуры ──────
+  // ─── Lvl 13: очень сложный, 8×8, только крупные фигуры ─────────────
   {
     levelId: "level_13",
-    grid: { rows: 7, cols: 7 },
+    grid: { rows: 8, cols: 8 },
     targetScore: 300,
-    initialBoard: paintBoard(7, 7, (set) => {
+    initialBoard: paintBoard(8, 8, (set) => {
       set(5, 0, AMBER); set(5, 1, AMBER); set(6, 0, AMBER); set(6, 1, AMBER);
     }),
     figures: {
@@ -357,15 +357,15 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     visual: { backgroundId: "wood_classic", cubeStyle: "pseudo3d", showDebugGrid: false }
   },
 
-  // ─── Lvl 14: очень сложный, 9×9, пунктирная рамка ─────────────────
+  // ─── Lvl 14: очень сложный, 8×8, пунктирная рамка ─────────────────
   {
     levelId: "level_14",
-    grid: { rows: 9, cols: 9 },
+    grid: { rows: 8, cols: 8 },
     targetScore: 420,
-    initialBoard: paintBoard(9, 9, (set) => {
-      for (let i = 0; i < 9; i += 2) {
-        set(0, i, COBALT); set(8, i, COBALT);
-        set(i, 0, ROSE); set(i, 8, ROSE);
+    initialBoard: paintBoard(8, 8, (set) => {
+      for (let i = 0; i < 8; i += 2) {
+        set(0, i, COBALT); set(7, i, COBALT);
+        set(i, 0, ROSE); set(i, 7, ROSE);
       }
     }),
     figures: {
@@ -382,17 +382,17 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     visual: { backgroundId: "wood_dark", cubeStyle: "pseudo3d", showDebugGrid: false }
   },
 
-  // ─── Lvl 15: финальный, 10×10, рамка + центр, упор на фигуру 15 ────
+  // ─── Lvl 15: финальный, 8×8, рамка + центр, упор на фигуру 15 ─────
   {
     levelId: "level_15",
-    grid: { rows: 10, cols: 10 },
+    grid: { rows: 8, cols: 8 },
     targetScore: 520,
-    initialBoard: paintBoard(10, 10, (set) => {
-      for (let i = 0; i < 10; i += 2) {
-        set(0, i, PURPLE); set(9, i, PURPLE);
-        set(i, 0, AMBER); set(i, 9, AMBER);
+    initialBoard: paintBoard(8, 8, (set) => {
+      for (let i = 0; i < 8; i += 2) {
+        set(0, i, PURPLE); set(7, i, PURPLE);
+        set(i, 0, AMBER); set(i, 7, AMBER);
       }
-      set(4, 4, COBALT); set(4, 5, COBALT); set(5, 4, COBALT); set(5, 5, COBALT);
+      set(3, 3, COBALT); set(3, 4, COBALT); set(4, 3, COBALT); set(4, 4, COBALT);
     }),
     figures: {
       availableShapeIds: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"],

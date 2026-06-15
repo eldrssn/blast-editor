@@ -7,7 +7,7 @@
 
 ## 1. Обзор
 
-Core-игра в стиле Block Blast + редактор уровней с live preview. Одна страница — `/editor`. Корень `/` редиректит на `/editor` ([src/app/page.tsx](src/app/page.tsx)).
+Core-игра в стиле Block Blast + редактор уровней с live preview. Главная `/` запускает игру со **случайным уровнем** и открывает настройки уровня в одном экране; `/editor` остаётся полноценной desktop-страницей редактора ([src/app/page.tsx](src/app/page.tsx), [src/app/editor/page.tsx](src/app/editor/page.tsx)).
 
 **Стек (фактический, [package.json](package.json)):**
 - Next.js `16.2.9` (App Router) — в ТЗ заявлен 15+, по факту 16.
@@ -26,7 +26,7 @@ Core-игра в стиле Block Blast + редактор уровней с liv
 ```txt
 src/
   app/
-    page.tsx              # redirect → /editor
+    page.tsx              # главная: игра со случайным уровнем + настройки уровня
     editor/page.tsx       # страница редактора (metadata + <LevelEditor/>)
     layout.tsx, globals.css
 
@@ -70,6 +70,9 @@ src/
         sections/           # 8 секций формы (см. §7)
       model/useLevelEditor.ts  # вся логика редактора (edit/applied config, JSON, toast)
       styles/*.module.scss
+    home-game/
+      ui/HomeGameScreen.tsx      # главная: GameCore + drawer/side-sheet настроек
+      styles/HomeGameScreen.module.scss
 
   shared/lib/sound.ts       # soundManager (singleton, синтез WAV → Howler)
 ```
@@ -181,13 +184,14 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 
 ---
 
-## 7. Редактор уровней (`widgets/level-editor`)
+## 7. Редактор уровней (`widgets/level-editor`) и главная игра (`widgets/home-game`)
 
 - **LevelEditor.tsx** — layout: левая `editorPane` (`<EditorForm/>`) + правая `previewPane` (`<GameCore config={appliedConfig}/>`) + inline-toast.
-- **useLevelEditor.ts** — вся логика. Разделяет **`editConfig`** (то, что редактируется) и **`appliedConfig`** (то, что играется в preview). Превью обновляется только после **«Применить»**. `validationErrors` выводятся через `useMemo` из `editConfig`. JSON-зеркало (`jsonText`) синхронизируется; ручной ввод JSON парсится «на лету» (сохраняет сырой текст, при ошибке — `jsonError`). Toast вместо `alert`.
-  - Хэндлеры: `handleTemplateChange` (выбор из `DEFAULT_LEVELS` или `"custom"`), `handleConfigChange`, `handleApply`, `handleReset`, `handleCopyJson` (clipboard), `handleImportJson`, `handleJsonChange`.
+- **HomeGameScreen.tsx** — mobile-first домашний экран: один раз выбирает случайный стартовый уровень из `DEFAULT_LEVELS`, показывает `GameCore`, кнопку открытия настроек и drawer/side-sheet с тем же `EditorForm`. После успешного `Применить` панель закрывается, поэтому игру можно тестировать на телефоне в одном экране.
+- **useLevelEditor.ts** — общая логика и для `/editor`, и для `/`. Разделяет **`editConfig`** (то, что редактируется) и **`appliedConfig`** (то, что играется в preview/на главной). Игра обновляется только после **«Применить»**; выбор шаблона и импорт JSON меняют только draft редактора. `validationErrors` выводятся через `useMemo` из `editConfig`. JSON-зеркало (`jsonText`) синхронизируется; ручной ввод JSON парсится «на лету» (сохраняет сырой текст, при ошибке — `jsonError`). Toast вместо `alert`.
+  - Хэндлеры: `handleTemplateChange` (выбор из `DEFAULT_LEVELS` или `"custom"`), `handleConfigChange`, `handleApply` (возвращает `boolean` успеха), `handleReset`, `handleCopyJson` (clipboard), `handleImportJson`, `handleJsonChange`.
 - **EditorForm.tsx** — композиция 8 секций (`sections/`):
-  `TemplateSection` (выбор шаблона по `levelId`) · `MainParamsSection` (levelId/targetScore/grid — без названия уровня) · `InitialBoardSection` (интерактивная сетка: клик включает/выключает блок + цвет; кисти воды нет — все блоки «с водой») · `FiguresSection` (availableShapeIds + spawnWeights, каждая фигура показана мини-превью через [FigurePreview.tsx](src/widgets/level-editor/ui/FigurePreview.tsx)) · `BoostersSection` (enabled/count/multiplierValue/hammer area) · `ProtectionSection` (enabled + clearBoardCost) · `VisualSection` (только `showDebugGrid`; фон и стиль кубиков всегда фиксированы) · `JsonSection` (textarea + ошибки + Импорт).
+  `TemplateSection` (выбор шаблона по `levelId`) · `MainParamsSection` (levelId/targetScore/grid — без названия уровня) · `InitialBoardSection` (интерактивная сетка: клик включает/выключает блок + цвет; кисти воды нет — все блоки «с водой») · `FiguresSection` (availableShapeIds + spawnWeights, каждая фигура показана мини-превью через [FigurePreview.tsx](src/widgets/level-editor/ui/FigurePreview.tsx); доступные фигуры идут сеткой `4` в ряд, веса генерации — `2` в ряд) · `BoostersSection` (enabled/count/multiplierValue/hammer area) · `ProtectionSection` (enabled + clearBoardCost) · `VisualSection` (только `showDebugGrid`; фон и стиль кубиков всегда фиксированы) · `JsonSection` (textarea + ошибки + Импорт).
 - **[FigurePreview.tsx](src/widgets/level-editor/ui/FigurePreview.tsx)** — чистый React/CSS-grid компонент: по `shapeId` берёт геометрию из `FIGURE_SHAPES` и рисует мини-фигуру (без Pixi). Используется в `FiguresSection` в списке выбора и рядом с весами.
 
 ### GameCore ↔ редактор: ключевая оптимизация
@@ -202,11 +206,11 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 ## 8. Конфиги и контент
 
 - **[figureShapes.ts](src/entities/game/config/figureShapes.ts)** — `FIGURE_SHAPES` (15 фигур, id `"1"`…`"15"`) + `DEFAULT_FIGURE_WEIGHTS` (веса спавна; `"1"`=16 … `"15"`=1).
-- **[defaultLevels.ts](src/entities/game/config/defaultLevels.ts)** — **15 уровней** (`level_1`…`level_15`, без поля `title`), кривая сложности «от лёгких к сложным» (растут targetScore, размер сетки, число и крупность фигур, плотность препятствий, стоимость защиты; беднеет инвентарь бустеров; фоны циклятся classic/dark/royal). Препятствия рисуются хелпером `paintBoard(rows, cols, set => …)` (out-of-bounds игнорируется).
+- **[defaultLevels.ts](src/entities/game/config/defaultLevels.ts)** — **15 уровней** (`level_1`…`level_15`, без поля `title`), все уровни используют поле **`8×8`**; кривая сложности строится через `targetScore`, число и крупность фигур, плотность препятствий и стоимость защиты; инвентарь бустеров беднеет, фоны циклятся classic/dark/royal. Препятствия рисуются хелпером `paintBoard(rows, cols, set => …)` (out-of-bounds игнорируется).
   - `level_1` target 60 (8×8) · `level_2` 120 · `level_3` 200 — исходное «ядро».
-  - `level_4`–`level_8`: 90→200, чистое поле → углы/полоса/блоки 2×2, сетки 8×8/9×9.
-  - `level_9`–`level_12`: 240→360, только крупные фигуры / диагонали / рассыпка, 9×9 и 10×10.
-  - `level_13`–`level_15`: 300→520, тесное 7×7 с крупными фигурами, пунктирные рамки, финал 10×10 (упор на фигуру `15`, множитель ×3).
+  - `level_4`–`level_8`: 90→200, чистое поле → углы/полоса/блоки 2×2 на `8×8`.
+  - `level_9`–`level_12`: 240→360, только крупные фигуры / диагонали / рассыпка, но всё ещё на `8×8`.
+  - `level_13`–`level_15`: 300→520, плотные паттерны препятствий и финальный упор на фигуру `15` с множителем ×3, тоже на `8×8`.
   - `defaultColors`: Rose `#FF708A`, Emerald `#3CD070`, Cobalt `#3C70FF`, Amber `#F59E0B`, Purple `#B070FF` (+ именованные константы `ROSE/EMERALD/COBALT/AMBER/PURPLE`).
 
 ---
