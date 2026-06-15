@@ -1,6 +1,6 @@
 .viewport {
   width: 100%;
-  max-width: 360px;
+  max-width: min(100vw, 420px);
   max-height: 800px;
   aspect-ratio: 9 / 16;
   background: #ffffff;
@@ -9,6 +9,18 @@
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
   position: relative;
   overflow: hidden;
+}
+
+@media (max-width: 767px) {
+  .viewport {
+    max-width: none;
+    width: min(100vw, calc((100svh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) * 9 / 16));
+    max-height: none;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    box-shadow: none;
+  }
 }
 
 // The div that Pixi appends its <canvas> into

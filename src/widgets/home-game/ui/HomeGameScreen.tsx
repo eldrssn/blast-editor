@@ -39,15 +39,16 @@ export default function HomeGameScreen({ initialLevel }: HomeGameScreenProps) {
 
   return (
     <div className={styles.screen}>
-      <div className={styles.topBar}>
-        <button
-          type="button"
-          className={styles.settingsButton}
-          onClick={() => setIsSettingsOpen(true)}
-        >
-          Настройки уровня
-        </button>
-      </div>
+      <button
+        type="button"
+        className={styles.settingsButton}
+        aria-label="Открыть настройки уровня"
+        onClick={() => setIsSettingsOpen(true)}
+      >
+        <span />
+        <span />
+        <span />
+      </button>
 
       <div className={styles.gameStage}>
         <GameCore config={appliedConfig} />
