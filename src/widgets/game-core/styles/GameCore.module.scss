@@ -128,19 +128,36 @@
   }
 }
 
+.hammerActions {
+  display: flex;
+  gap: 8px;
+}
+
+.hammerApply,
 .hammerCancel {
   pointer-events: auto;
   padding: 6px 18px;
   border: none;
   border-radius: 10px;
-  background: #dc2626;
   color: #fff;
   font-size: 13px;
   font-weight: 700;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   cursor: pointer;
-  box-shadow: 0 3px 10px rgba(239, 68, 68, 0.35);
+}
 
+.hammerApply {
+  background: #16a34a;
+  box-shadow: 0 3px 10px rgba(22, 163, 74, 0.35);
+}
+
+.hammerCancel {
+  background: #dc2626;
+  box-shadow: 0 3px 10px rgba(239, 68, 68, 0.35);
+}
+
+.hammerApply,
+.hammerCancel {
   &:active {
     transform: translateY(1px);
   }

@@ -53,7 +53,7 @@ src/
       pixi/
         GameApplication.ts  # Application, resize, letterbox, прокси-методы
         GameScene.ts        # оркестратор слоёв + вся placement/booster-логика
-        BackgroundLayer.ts  # деревянный фон по visual.backgroundId
+        BackgroundLayer.ts  # ровный светло-коричневый фон сцены
         BoardLayer.ts       # сетка, кубы, подсветка placement, рамка молотка
         FigureLayer.ts      # слоты, левитация, drag-and-drop, bounce/return
         EffectsLayer.ts     # частицы воды, pop-анимации, combo-лейбл
@@ -165,22 +165,22 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
         └────────── GameSceneCallbacks (board/figures/score/status/hammer) ──┘
 ```
 
-- **GameApplication** — владеет `Application`, монтирует canvas, `ResizeObserver` с rAF-коалесингом, letterbox-масштаб сцены (`scale = min(scaleX, scaleY)`), DPR cap = 2, `antialias` всегда включён. Прокси-методы: `collectAll/enterHammerMode/exitHammerMode/setTickerActive/applyVisualConfig/updateState`.
+- **GameApplication** — владеет `Application`, монтирует canvas, `ResizeObserver` с rAF-коалесингом, letterbox-масштаб сцены (`scale = min(scaleX, scaleY)`), DPR cap = 2, `antialias` всегда включён. Прокси-методы: `collectAll/enterHammerMode/confirmHammerMode/exitHammerMode/setTickerActive/applyVisualConfig/updateState`.
 - **GameScene** — оркестратор. Держит `board/figures/score/isMultiplierActive/multiplierValue`. Здесь вся **placement-логика** (`handlePlacementAttempt` → `handlePlacementSuccess` → `awardAndAnimateClear` → `afterClear`/`resolvePostMove`) и **исполнение бустеров** (`collectAll`, `applyHammerAt`). Единый `Ticker` гоняет левитацию + анимацию HUD + рамку молотка; `setTickerActive(false)` останавливает его на оверлеях.
   - `applyVisualConfig(config)` — горячее применение **косметики** (фон, лейбл уровня, targetScore, multiplierValue, `showDebugGrid`) без перестройки сцены.
 - **BoardLayer** — сетка, пул кубов (`acquireCube`), `showHighlight` (зелёный/красный placement), `showHammerArea`+`tickHammer` (пульсация рамки), `getGridInfo()` (cellSize/offset — единый источник координат), `setShowDebugGrid(bool)`/`renderDebugGrid` (отладочная сетка границ клеток поверх поля).
 - **FigureLayer** — слоты внизу, `updateLevitation`, drag-and-drop (`onFigurePointerDown/onPointerMove/onPointerUp`), `getGridPositionFromPointer`, `playBounceAnimation`, `animateReturnToSlot`. Колбэки в сцену: `getGridInfo/canPlaceAt/onHighlightUpdate/onPlacementAttempt/onPlacementSuccess`. `FigureLayer.slotHeight` / `FigureLayer.boosterBand` — статик. **Идемпотентный `draw`:** через `renderedKeys[slot]` (uid фигуры) графика слота пересоздаётся только при смене фигуры — посторонние ре-рендеры (board/score за одну установку) больше не пересоздают неизменные фигуры и не сбрасывают их левитацию (был «прыжок» при установке). Перетаскивание сбрасывает ключ слота (`redrawSlotWithoutFigure`).
 - **EffectsLayer** — `playLineClear` (pop-кубы + капли воды `spawnDroplet`/`spawnSplash` летят в HUD + combo-лейбл `showCombo` при ≥2 линий). Свой tween-loop, пул графики. Эффекты всегда включены (тумблера нет).
 - **HudLayer** — прогресс-бар воды + счёт `0/target`, лейбл уровня (`formatLevelLabel(levelId)` → «Уровень N», число берётся из `levelId`), `tick` (плавный счётчик), `pulse`, `snapScore`, `getWaterTargetPoint()` (цель для капель), x2-индикатор при активном множителе.
-- **HammerController** — только ввод режима молотка: `enter/cancel`, отслеживание области под указателем, размер из `config.boosters.hammer.areaRows/Cols`, `onConfirm(area)` → `GameScene.applyHammerAt`.
+- **HammerController** — только ввод режима молотка: `enter/confirm/cancel`, отслеживание области под указателем, размер из `config.boosters.hammer.areaRows/Cols`. На тач-экранах `pointerup` больше не применяет бустер: область выбирается жестом, а применение вызывается отдельно через `confirm()` → `GameScene.applyHammerAt`.
 - **cube.ts / cubeContext.ts** — `drawPseudo3DCube` (основной цвет, тёмная нижняя грань, highlight, тень, скругление `CORNER_RADIUS=5`, `DEPTH=5`); `getCubeContext` кэширует `GraphicsContext` по `цвет+размер`.
 
 ### Бустеры — логика consume
 - **collectAll**: `GameScene.collectAll()` возвращает `false` если борд пуст или активен молоток → заряд **не** тратится. React списывает заряд только при `true`.
 - **multiplier**: активируется через стор (`activateMultiplier`), действует до конца уровня, `x2`-индикатор в HUD. Множитель **не блокирует** другие бустеры — collectAll/hammer работают и при активном множителе (их очки тоже множатся).
-- **hammer**: вход в `booster_selecting`; `onHammerComplete(consumed)` — заряд тратится только если реально удалены клетки (подтверждение над пустой областью → `false`).
+- **hammer**: вход в `booster_selecting`; игрок двигает рамку по полю и подтверждает действие отдельной кнопкой `Применить`; `onHammerComplete(consumed)` — заряд тратится только если реально удалены клетки (подтверждение над пустой областью → `false`).
 
-**Окно подтверждения (защита от дурака):** клик по «Собрать всё»/«Множитель» в [GameCore.tsx](src/widgets/game-core/ui/GameCore.tsx) не применяет бустер сразу, а открывает оверлей (`pendingBooster` + переиспользование `.overlayCard`) с описанием действия и кнопками «Применить»/«Отмена». Молоток имеет собственный режим выбора, поэтому окна не требует.
+**Подтверждение бустеров (защита от дурака):** клик по «Собрать всё»/«Множитель» в [GameCore.tsx](src/widgets/game-core/ui/GameCore.tsx) не применяет бустер сразу, а открывает оверлей (`pendingBooster` + переиспользование `.overlayCard`) с описанием действия и кнопками «Применить»/«Отмена». Молоток использует собственный inline-режим выбора: поверх игры показывается подсказка с кнопками `Применить`/`Отмена`, а отпускание пальца только завершает позиционирование рамки.
 
 ---
 
@@ -199,7 +199,7 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 - **`structuralKey`** (`useMemo`) = grid, targetScore, initialBoard, figures, protectionFromLoss, booster counts/enabled → при изменении **полная перестройка Pixi + рестарт уровня**.
 - **косметика** (levelId/лейбл уровня, `visual.showDebugGrid`, multiplierValue) → `applyVisualConfig` **горячо**, без сброса прогресса.
 
-Оверлеи в GameCore: **победа** (status `won`), **поражение** (`lost`), **защита от поражения** (`protection_from_loss` — «Короб заполнен»/«Нет доступных ходов», кнопка очистки с учётом `clearBoardCost` и проверкой `canAffordClear`), **подтверждение бустера** (`pendingBooster` для collectAll/multiplier — «Применить»/«Отмена», см. §6).
+Оверлеи в GameCore: **победа** (status `won`), **поражение** (`lost`), **защита от поражения** (`protection_from_loss` — «Короб заполнен»/«Нет доступных ходов», кнопка очистки с учётом `clearBoardCost` и проверкой `canAffordClear`), **подтверждение бустера** (`pendingBooster` для collectAll/multiplier — «Применить»/«Отмена», см. §6). Для молотка вместо модалки показывается inline-панель выбора с теми же действиями.
 
 ---
 
@@ -235,11 +235,11 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 | Размещение / очистка линий | `entities/game/lib/board.ts` |
 | Win/lose/regenerate/protection | `entities/game/lib/gameFlow.ts` + `gameStore.ts` |
 | Поведение бустера (логика) | `entities/game/lib/boosters.ts` + `GameScene.ts` |
-| Бустер-UI / оверлеи / окно подтверждения | `GameCore.tsx` (`pendingBooster`) |
+| Бустер-UI / оверлеи / окно подтверждения | `GameCore.tsx` (`pendingBooster`, `isHammerSelecting`) |
 | Порядок раскладки / полоса бустеров | `FigureLayer.boosterBand` + `GameScene.renderState` + `GameCore.module.scss` (`.boosterBar`) |
 | Кламп очков по цели | `GameScene.awardAndAnimateClear` (`onScoreArrive`) |
 | Внешний вид куба | `pixi/cube.ts`, `pixi/cubeContext.ts` |
-| Фон | `pixi/BackgroundLayer.ts` (`visual.backgroundId`) |
+| Фон | `pixi/BackgroundLayer.ts` (ровная светло-коричневая заливка) |
 | Анимации очистки/воды | `pixi/EffectsLayer.ts` |
 | HUD / прогресс-бар | `pixi/HudLayer.ts` |
 | Drag-and-drop | `pixi/FigureLayer.ts` |
@@ -260,11 +260,11 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 
 1. **Поле `title` удалено** из `LevelConfig`. Редактор оперирует только `levelId`; в игре HUD показывает «Уровень N», где N извлекается из `levelId` (`formatLevelLabel`).
 2. **Поле `hasWater` удалено** из `BoardCell`/`BoardCellConfig`/`ClearedCellCoord`. Все кубики считаются «с водой»: капли/очки при очистке формируются для каждой клетки независимо от флага. Кисть «Блок с водой» из редактора убрана.
-3. **Редактор визуала урезан:** выбор `backgroundId` и `cubeStyle` убран из UI (значения фиксированы, остаются дефолтами в `normalize`). Тумблер `showDebugGrid` теперь **реально работает** — рисует отладочную сетку в `BoardLayer`.
+3. **Редактор визуала урезан:** выбор `backgroundId` и `cubeStyle` убран из UI. `cubeStyle` остаётся дефолтом в `normalize`, а `backgroundId` пока сохранён только в данных для совместимости и не влияет на рендер: `BackgroundLayer` рисует единый светло-коричневый фон. Тумблер `showDebugGrid` теперь **реально работает** — рисует отладочную сетку в `BoardLayer`.
 4. **Фигуры в редакторе** показываются мини-превью (`FigurePreview`) вместо «#id».
 5. **Кламп очков** по `targetScore` при начислении — счёт не может превысить цель (нет «100/60»).
 6. **Левитация фигур** больше не «дёргается» при установке — `FigureLayer.draw` идемпотентен (`renderedKeys`).
-7. **Бустеры «Собрать всё» и «Множитель»** требуют подтверждения в модальном окне (защита от дурака); множитель не блокирует другие бустеры.
+7. **Все бустеры требуют явного подтверждения**: «Собрать всё» и «Множитель» — в модальном окне, молоток — отдельной кнопкой `Применить` в режиме выбора; множитель не блокирует другие бустеры.
 8. **Порядок раскладки сцены** изменён на HUD → поле → фигуры → бустеры (бар бустеров перенесён вниз, зарезервирована полоса `BOOSTER_BAND`).
 9. **Уровней стало 15** (было 3): добавлены `level_4`…`level_15` с прогрессией сложности (см. §8).
 

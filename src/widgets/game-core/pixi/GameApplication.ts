@@ -114,6 +114,11 @@ export class GameApplication {
     this.scene?.exitHammerMode();
   }
 
+  /** Confirm the currently selected hammer area. */
+  confirmHammerMode() {
+    return this.scene?.confirmHammerMode() ?? false;
+  }
+
   /** Pause/resume the scene's idle animation ticker (driven by game status). */
   setTickerActive(active: boolean) {
     this.scene?.setTickerActive(active);

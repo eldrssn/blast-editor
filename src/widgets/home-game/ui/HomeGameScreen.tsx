@@ -40,7 +40,6 @@ export default function HomeGameScreen({ initialLevel }: HomeGameScreenProps) {
   return (
     <div className={styles.screen}>
       <div className={styles.topBar}>
-        <div className={styles.levelBadge}>Случайный уровень: {appliedConfig.levelId}</div>
         <button
           type="button"
           className={styles.settingsButton}

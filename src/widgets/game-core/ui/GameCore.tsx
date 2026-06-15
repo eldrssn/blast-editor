@@ -30,9 +30,9 @@ export default function GameCore({ config }: GameCoreProps) {
   const setStatus = useGameStore((s) => s.setStatus);
   const clearBoardAndContinue = useGameStore((s) => s.clearBoardAndContinue);
 
-  // Booster awaiting confirmation. The instant-effect boosters ("Собрать всё" и
-  // "Множитель") открывают окно с описанием и кнопками Применить/Отмена — как
-  // молоток даёт шанс понять и отменить действие. Молоток подтверждает себя сам.
+  // Booster awaiting confirmation. Instant boosters ("Собрать всё" и
+  // "Множитель") use a dialog; hammer has its own in-scene selection mode with
+  // separate Apply/Cancel controls.
   const [pendingBooster, setPendingBooster] = useState<"collectAll" | "multiplier" | null>(null);
 
   // "Короб заполнен" when every cell is occupied, otherwise just no valid moves.
@@ -113,6 +113,10 @@ export default function GameCore({ config }: GameCoreProps) {
     const store = useGameStore.getState();
     store.setActiveBooster(null);
     store.setStatus("playing");
+  }, []);
+
+  const handleConfirmHammer = useCallback(() => {
+    gameAppRef.current?.confirmHammerMode();
   }, []);
 
   // Apply the booster awaiting confirmation, then close the dialog.
@@ -253,10 +257,18 @@ export default function GameCore({ config }: GameCoreProps) {
       {/* Hammer selection hint */}
       {isHammerSelecting && (
         <div className={styles.hammerHint}>
-          <span>Выберите область 4×4 и подтвердите нажатием</span>
-          <button className={styles.hammerCancel} onClick={handleCancelHammer}>
-            Отмена
-          </button>
+          <span>
+            Выберите область {config.boosters.hammer.areaRows}×{config.boosters.hammer.areaCols}
+            {" "}и подтвердите действие
+          </span>
+          <div className={styles.hammerActions}>
+            <button className={styles.hammerApply} onClick={handleConfirmHammer}>
+              Применить
+            </button>
+            <button className={styles.hammerCancel} onClick={handleCancelHammer}>
+              Отмена
+            </button>
+          </div>
         </div>
       )}
 

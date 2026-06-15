@@ -26,6 +26,7 @@ type HammerControllerOptions = {
 export class HammerController {
   private active = false;
   private area: HammerArea | null = null;
+  private pointerDown = false;
 
   constructor(private readonly opts: HammerControllerOptions) {}
 
@@ -60,6 +61,15 @@ export class HammerController {
     this.opts.setFiguresInteractive(true);
   }
 
+  /** Confirm the currently selected area and hand execution to the scene. */
+  confirm() {
+    if (!this.active || !this.area) return false;
+    const area = this.area;
+    this.teardown();
+    this.opts.onConfirm(area);
+    return true;
+  }
+
   /** Remove listeners + overlay and clear the active flag (keeps figures off). */
   private teardown() {
     const { target } = this.opts;
@@ -70,27 +80,25 @@ export class HammerController {
     this.opts.showArea(null);
     this.area = null;
     this.active = false;
+    this.pointerDown = false;
   }
 
   private onMove = (e: FederatedPointerEvent) => {
-    if (!this.active) return;
+    if (!this.active || !this.pointerDown) return;
     const p = this.opts.target.toLocal(e.global);
     this.updateArea(p.x, p.y);
   };
 
   private onDown = (e: FederatedPointerEvent) => {
     if (!this.active) return;
+    this.pointerDown = true;
     const p = this.opts.target.toLocal(e.global);
     this.updateArea(p.x, p.y);
   };
 
   private onUp = () => {
-    if (!this.active || !this.area) return;
-    const area = this.area;
-    // Tear down the input first (clears overlay); the scene then applies the
-    // hammer and decides when figures become interactive again.
-    this.teardown();
-    this.opts.onConfirm(area);
+    if (!this.active) return;
+    this.pointerDown = false;
   };
 
   /** Position the frame centred on the given scene-local point, clamped. */

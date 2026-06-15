@@ -326,6 +326,11 @@ export class GameScene extends Container {
     this.hammer.cancel();
   }
 
+  /** Confirm the current hammer area. Returns false if no selection is active. */
+  confirmHammerMode() {
+    return this.hammer.confirm();
+  }
+
   /**
    * Apply the hammer at the confirmed area: remove filled cells inside it and
    * award score. A confirm over an area with no filled cells resolves without
