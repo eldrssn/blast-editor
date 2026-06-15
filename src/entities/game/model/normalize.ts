@@ -56,15 +56,13 @@ export function normalizeLevelConfig(config: Partial<LevelConfig> | null | undef
     },
     hammer: {
       enabled: config?.boosters?.hammer?.enabled !== false,
-      initialCount: config?.boosters?.hammer?.initialCount ?? 1,
-      areaRows: config?.boosters?.hammer?.areaRows ?? 4,
-      areaCols: config?.boosters?.hammer?.areaCols ?? 4
+      initialCount: config?.boosters?.hammer?.initialCount ?? 1
+      // Зона действия молотка всегда 4×4 (HAMMER_AREA_SIZE), не из конфига.
     }
   };
 
   const protectionFromLoss = {
-    enabled: config?.protectionFromLoss?.enabled !== false,
-    clearBoardCost: config?.protectionFromLoss?.clearBoardCost ?? 20
+    enabled: config?.protectionFromLoss?.enabled !== false
   };
 
   const visual = {

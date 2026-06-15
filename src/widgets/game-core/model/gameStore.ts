@@ -113,11 +113,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       ? generateFigureSet(config, board)
       : currentFigures;
 
-    // Spend the configured cost in water/score (clamped at 0). A cost of 0 makes
-    // the protection clear free, per level rules.
-    const cost = config.protectionFromLoss?.clearBoardCost ?? 0;
-    const nextScore = Math.max(0, score - cost);
-
-    set({ board, currentFigures: figures, status: "playing", score: nextScore });
+    // Tester build: the protection clear is free — no score is deducted.
+    set({ board, currentFigures: figures, status: "playing", score });
   },
 }));

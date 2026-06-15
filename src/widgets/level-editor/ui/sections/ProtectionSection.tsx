@@ -14,10 +14,6 @@ export default function ProtectionSection({ config, onChange }: Props) {
     onChange({ ...config, protectionFromLoss: { ...config.protectionFromLoss, enabled } });
   };
 
-  const handleProtectionCostChange = (clearBoardCost: number) => {
-    onChange({ ...config, protectionFromLoss: { ...config.protectionFromLoss, clearBoardCost } });
-  };
-
   return (
     <div className={styles.section}>
       <h3>Защита от поражения</h3>
@@ -30,16 +26,6 @@ export default function ProtectionSection({ config, onChange }: Props) {
         />
         <label htmlFor="protection-enabled">Включить защиту при заполнении поля</label>
       </div>
-      {config.protectionFromLoss?.enabled !== false && (
-        <div className={`${styles.field} ${styles.indentRow}`}>
-          <label>Стоимость очистки поля (Вода/Очки)</label>
-          <input
-            type="number"
-            value={config.protectionFromLoss?.clearBoardCost ?? 0}
-            onChange={(e) => handleProtectionCostChange(parseInt(e.target.value) || 0)}
-          />
-        </div>
-      )}
     </div>
   );
 }

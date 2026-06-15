@@ -11,6 +11,15 @@ const SLOT_HEIGHT = 120;
 const BOOSTER_BAND = 70;
 const LEVITATION_AMPLITUDE = 3;
 const LEVITATION_SPEED = 0.002;
+/** Spawn-in animation timing: each new slot pops in after the previous one. */
+const SPAWN_STAGGER_MS = 110;
+const SPAWN_DURATION_MS = 320;
+
+const easeOutBack = (t: number) => {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+};
 
 /** Describes the dragging state for one figure */
 type DragState = {
@@ -62,6 +71,14 @@ export class FigureLayer extends Container {
    * figures and restart their levitation — fixes the "jump" on placement.
    */
   private renderedKeys: (string | null)[] = [];
+
+  /**
+   * Figure uids that have already played their spawn-in animation. A freshly
+   * generated set (initGame / regenerate) has new uids → each pops in, staggered;
+   * a figure returning to its slot after an invalid drop keeps its uid → no
+   * re-animation.
+   */
+  private seenUids = new Set<string>();
 
   /** Active rAF ids for bounce/return animations, cancelled on destroy. */
   private rafIds = new Set<number>();
@@ -185,6 +202,15 @@ export class FigureLayer extends Container {
       });
 
       slot.addChild(figContainer);
+
+      // First time we see this figure → stagger a "pop in" animation. Returning
+      // figures (same uid) skip this and appear instantly in place.
+      if (!this.seenUids.has(figure.uid)) {
+        this.seenUids.add(figure.uid);
+        const centerX = originX + figW / 2;
+        const centerY = originY + figH / 2;
+        this.playSpawnAnimation(figContainer, figG, centerX, centerY, i * SPAWN_STAGGER_MS);
+      }
     }
   }
 
@@ -429,6 +455,47 @@ export class FigureLayer extends Container {
       cb();
     });
     this.rafIds.add(id);
+  }
+
+  /**
+   * Pop a freshly spawned figure in: scale from 0 → 1 with an overshoot
+   * (easeOutBack) + fade, around the figure's own center. `delay` staggers the
+   * three slots so they appear one after another. Levitation (which moves the
+   * parent container's y) is unaffected — this only touches `figG` scale + alpha.
+   */
+  private playSpawnAnimation(
+    container: Container,
+    figG: Graphics,
+    centerX: number,
+    centerY: number,
+    delay: number
+  ) {
+    // Scale figG around the figure's center so it grows from the middle, not a corner.
+    figG.pivot.set(centerX, centerY);
+    figG.position.set(centerX, centerY);
+    figG.scale.set(0);
+    container.alpha = 0;
+
+    const startTime = performance.now() + delay;
+    const animate = () => {
+      const now = performance.now();
+      const elapsed = now - startTime;
+      if (elapsed < 0) {
+        this.scheduleRaf(animate);
+        return;
+      }
+      const t = Math.min(elapsed / SPAWN_DURATION_MS, 1);
+      figG.scale.set(easeOutBack(t));
+      container.alpha = Math.min(t * 1.5, 1);
+
+      if (t < 1) {
+        this.scheduleRaf(animate);
+      } else {
+        figG.scale.set(1);
+        container.alpha = 1;
+      }
+    };
+    this.scheduleRaf(animate);
   }
 
   private playBounceAnimation(container: Container, onComplete: () => void) {

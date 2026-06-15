@@ -104,6 +104,15 @@ export class GameApplication {
     return this.scene?.collectAll() ?? false;
   }
 
+  /** Animate the protection board clear (cube pops, no water/score). */
+  playBoardClear(onComplete: () => void) {
+    if (!this.scene || this._destroyed) {
+      onComplete();
+      return;
+    }
+    this.scene.playBoardClear(onComplete);
+  }
+
   /** Enter the hammer 4×4 selection mode. */
   enterHammerMode() {
     this.scene?.enterHammerMode();

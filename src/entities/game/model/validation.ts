@@ -108,23 +108,13 @@ export function validateLevelConfig(config: Partial<LevelConfig> | null | undefi
       if (typeof hammer.initialCount !== "number" || hammer.initialCount < 0) {
         errors.push("Количество зарядов бустера hammer должно быть неотрицательным числом.");
       }
-      if (typeof hammer.areaRows !== "number" || hammer.areaRows <= 0) {
-        errors.push("Высота зоны действия молотка (areaRows) должна быть положительным числом.");
-      }
-      if (typeof hammer.areaCols !== "number" || hammer.areaCols <= 0) {
-        errors.push("Ширина зоны действия молотка (areaCols) должна быть положительным числом.");
-      }
+      // Зона действия молотка фиксирована 4×4 — не валидируется.
     }
   }
 
   // protectionFromLoss
   if (!config.protectionFromLoss || typeof config.protectionFromLoss !== "object") {
     errors.push("Поле 'protectionFromLoss' должно быть объектом.");
-  } else {
-    const { clearBoardCost } = config.protectionFromLoss;
-    if (typeof clearBoardCost !== "number" || clearBoardCost < 0) {
-      errors.push("Стоимость защиты от поражения (clearBoardCost) должна быть неотрицательным числом.");
-    }
   }
 
   return errors;

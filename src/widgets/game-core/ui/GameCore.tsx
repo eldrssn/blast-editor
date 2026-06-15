@@ -5,6 +5,7 @@ import { LevelConfig } from "@/entities/game/model/types";
 import { useGameStore } from "../model/gameStore";
 import { GameApplication } from "../pixi/GameApplication";
 import { GameSceneCallbacks } from "../pixi/GameScene";
+import { HAMMER_AREA_SIZE } from "../pixi/HammerController";
 import { soundManager } from "@/shared/lib/sound";
 import styles from "../styles/GameCore.module.scss";
 
@@ -35,6 +36,10 @@ export default function GameCore({ config }: GameCoreProps) {
   // separate Apply/Cancel controls.
   const [pendingBooster, setPendingBooster] = useState<"collectAll" | "multiplier" | null>(null);
 
+  // True while the protection clear's vanish animation is playing — used to hide
+  // the booster bar so it doesn't flash over the field during the animation.
+  const [isClearing, setIsClearing] = useState(false);
+
   // "Короб заполнен" when every cell is occupied, otherwise just no valid moves.
   const isBoardFull =
     board.length > 0 && board.every((row) => row.every((cell) => cell.filled));
@@ -45,11 +50,7 @@ export default function GameCore({ config }: GameCoreProps) {
 
   const isPlaying = status === "playing";
   const isHammerSelecting = status === "booster_selecting" && activeBooster === "hammer";
-  const showBoosters = isPlaying || isHammerSelecting;
-
-  // Protection-from-loss clear cost (water/score). 0 = free.
-  const clearCost = config.protectionFromLoss?.clearBoardCost ?? 0;
-  const canAffordClear = score >= clearCost;
+  const showBoosters = (isPlaying || isHammerSelecting) && !isClearing;
 
   // Build callbacks for Pixi scene -> Zustand store
   const callbacksRef = useRef<GameSceneCallbacks>({
@@ -118,6 +119,21 @@ export default function GameCore({ config }: GameCoreProps) {
   const handleConfirmHammer = useCallback(() => {
     gameAppRef.current?.confirmHammerMode();
   }, []);
+
+  // Protection-from-loss "clear board" action. Hide the overlay first, play the
+  // vanish animation over the still-filled board, then wipe + regenerate via the
+  // store once the animation settles (tester build: no score is deducted).
+  const handleProtectionClear = useCallback(() => {
+    setIsClearing(true);
+    setStatus("playing");
+    const finish = () => {
+      clearBoardAndContinue();
+      setIsClearing(false);
+    };
+    const app = gameAppRef.current;
+    if (app) app.playBoardClear(finish);
+    else finish();
+  }, [setStatus, clearBoardAndContinue]);
 
   // Apply the booster awaiting confirmation, then close the dialog.
   const confirmPendingBooster = useCallback(() => {
@@ -258,8 +274,7 @@ export default function GameCore({ config }: GameCoreProps) {
       {isHammerSelecting && (
         <div className={styles.hammerHint}>
           <span>
-            Выберите область {config.boosters.hammer.areaRows}×{config.boosters.hammer.areaCols}
-            {" "}и подтвердите действие
+            Выберите область {HAMMER_AREA_SIZE}×{HAMMER_AREA_SIZE} и подтвердите действие
           </span>
           <div className={styles.hammerActions}>
             <button className={styles.hammerApply} onClick={handleConfirmHammer}>
@@ -351,20 +366,14 @@ export default function GameCore({ config }: GameCoreProps) {
               ⚠️ {isBoardFull ? "Короб заполнен" : "Нет доступных ходов"}
             </h2>
             <p className={styles.overlayText}>
-              {clearCost > 0
-                ? `Очистить поле за ${clearCost} 💧 и продолжить игру?`
-                : "Очистить поле и продолжить игру?"}
+              Очистить поле и продолжить игру или завершить уровень?
             </p>
             <div className={styles.overlayButtons}>
               <button
                 className={styles.overlayButton}
-                onClick={() => clearBoardAndContinue()}
-                disabled={!canAffordClear}
-                title={canAffordClear ? undefined : "Недостаточно воды для очистки"}
+                onClick={handleProtectionClear}
               >
-                {clearCost > 0
-                  ? `Очистить поле (−${clearCost} 💧)`
-                  : "Очистить поле и продолжить"}
+                Очистить поле и продолжить
               </button>
               <button
                 className={`${styles.overlayButton} ${styles.overlayButtonSecondary}`}

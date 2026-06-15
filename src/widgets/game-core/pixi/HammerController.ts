@@ -2,13 +2,18 @@ import { Container, FederatedPointerEvent } from "pixi.js";
 import { HammerArea } from "@/entities/game/model/types";
 import { GridInfoProvider } from "./FigureLayer";
 
+/**
+ * Hammer selection size is fixed at 4×4 for every level — neither bigger nor
+ * smaller. It is no longer configurable per level (was `boosters.hammer.area*`).
+ * On boards smaller than 4 in a dimension the frame is clamped to the board.
+ */
+export const HAMMER_AREA_SIZE = 4;
+
 type HammerControllerOptions = {
   /** Event target + coordinate space for the selection pointer (the scene). */
   target: Container;
   /** Current board geometry. */
   getGridInfo: GridInfoProvider;
-  /** Configured selection size (clamped to the board internally). */
-  getAreaSize: () => { rows: number; cols: number };
   /** Push the current selection to the board overlay (null clears it). */
   showArea: (area: HammerArea | null) => void;
   /** Enable/disable figure dragging while selecting. */
@@ -107,9 +112,8 @@ export class HammerController {
     if (info.cellSize <= 0) return;
     const cellFull = info.cellSize + info.gap;
 
-    const wanted = this.opts.getAreaSize();
-    const areaRows = Math.min(wanted.rows, info.rows);
-    const areaCols = Math.min(wanted.cols, info.cols);
+    const areaRows = Math.min(HAMMER_AREA_SIZE, info.rows);
+    const areaCols = Math.min(HAMMER_AREA_SIZE, info.cols);
 
     const pointerCol = Math.floor((localX - info.boardOffsetX) / cellFull);
     const pointerRow = Math.floor((localY - info.boardOffsetY) / cellFull);

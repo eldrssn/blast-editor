@@ -61,9 +61,9 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     boosters: {
       collectAll: { enabled: true, initialCount: 1 },
       multiplier: { enabled: true, initialCount: 1, multiplierValue: 2, duration: "until_level_end" },
-      hammer: { enabled: true, initialCount: 1, areaRows: 4, areaCols: 4 }
+      hammer: { enabled: true, initialCount: 1 }
     },
-    protectionFromLoss: { enabled: true, clearBoardCost: 10 },
+    protectionFromLoss: { enabled: true },
     visual: {
       backgroundId: "wood_classic",
       cubeStyle: "pseudo3d",
@@ -93,9 +93,9 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     boosters: {
       collectAll: { enabled: true, initialCount: 2 },
       multiplier: { enabled: true, initialCount: 1, multiplierValue: 2, duration: "until_level_end" },
-      hammer: { enabled: true, initialCount: 2, areaRows: 4, areaCols: 4 }
+      hammer: { enabled: true, initialCount: 2 }
     },
-    protectionFromLoss: { enabled: true, clearBoardCost: 20 },
+    protectionFromLoss: { enabled: true },
     visual: {
       backgroundId: "wood_dark",
       cubeStyle: "pseudo3d",
@@ -123,9 +123,9 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     boosters: {
       collectAll: { enabled: true, initialCount: 2 },
       multiplier: { enabled: true, initialCount: 2, multiplierValue: 2, duration: "until_level_end" },
-      hammer: { enabled: true, initialCount: 3, areaRows: 4, areaCols: 4 }
+      hammer: { enabled: true, initialCount: 3 }
     },
-    protectionFromLoss: { enabled: true, clearBoardCost: 30 },
+    protectionFromLoss: { enabled: true },
     visual: {
       backgroundId: "wood_royal",
       cubeStyle: "pseudo3d",
@@ -147,9 +147,9 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     boosters: {
       collectAll: { enabled: true, initialCount: 2 },
       multiplier: { enabled: true, initialCount: 1, multiplierValue: 2, duration: "until_level_end" },
-      hammer: { enabled: true, initialCount: 1, areaRows: 4, areaCols: 4 }
+      hammer: { enabled: true, initialCount: 1 }
     },
-    protectionFromLoss: { enabled: true, clearBoardCost: 15 },
+    protectionFromLoss: { enabled: true },
     visual: { backgroundId: "wood_classic", cubeStyle: "pseudo3d", showDebugGrid: false }
   },
 
@@ -170,9 +170,9 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     boosters: {
       collectAll: { enabled: true, initialCount: 2 },
       multiplier: { enabled: true, initialCount: 1, multiplierValue: 2, duration: "until_level_end" },
-      hammer: { enabled: true, initialCount: 2, areaRows: 4, areaCols: 4 }
+      hammer: { enabled: true, initialCount: 2 }
     },
-    protectionFromLoss: { enabled: true, clearBoardCost: 15 },
+    protectionFromLoss: { enabled: true },
     visual: { backgroundId: "wood_dark", cubeStyle: "pseudo3d", showDebugGrid: false }
   },
 
@@ -193,9 +193,9 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     boosters: {
       collectAll: { enabled: true, initialCount: 2 },
       multiplier: { enabled: true, initialCount: 1, multiplierValue: 2, duration: "until_level_end" },
-      hammer: { enabled: true, initialCount: 2, areaRows: 4, areaCols: 4 }
+      hammer: { enabled: true, initialCount: 2 }
     },
-    protectionFromLoss: { enabled: true, clearBoardCost: 20 },
+    protectionFromLoss: { enabled: true },
     visual: { backgroundId: "wood_royal", cubeStyle: "pseudo3d", showDebugGrid: false }
   },
 
@@ -215,9 +215,9 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     boosters: {
       collectAll: { enabled: true, initialCount: 1 },
       multiplier: { enabled: true, initialCount: 1, multiplierValue: 2, duration: "until_level_end" },
-      hammer: { enabled: true, initialCount: 2, areaRows: 4, areaCols: 4 }
+      hammer: { enabled: true, initialCount: 2 }
     },
-    protectionFromLoss: { enabled: true, clearBoardCost: 20 },
+    protectionFromLoss: { enabled: true },
     visual: { backgroundId: "wood_classic", cubeStyle: "pseudo3d", showDebugGrid: false }
   },
 
@@ -238,9 +238,9 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     boosters: {
       collectAll: { enabled: true, initialCount: 2 },
       multiplier: { enabled: true, initialCount: 2, multiplierValue: 2, duration: "until_level_end" },
-      hammer: { enabled: true, initialCount: 2, areaRows: 4, areaCols: 4 }
+      hammer: { enabled: true, initialCount: 2 }
     },
-    protectionFromLoss: { enabled: true, clearBoardCost: 25 },
+    protectionFromLoss: { enabled: true },
     visual: { backgroundId: "wood_dark", cubeStyle: "pseudo3d", showDebugGrid: false }
   },
 
@@ -260,9 +260,9 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     boosters: {
       collectAll: { enabled: true, initialCount: 2 },
       multiplier: { enabled: true, initialCount: 1, multiplierValue: 2, duration: "until_level_end" },
-      hammer: { enabled: true, initialCount: 2, areaRows: 4, areaCols: 4 }
+      hammer: { enabled: true, initialCount: 2 }
     },
-    protectionFromLoss: { enabled: true, clearBoardCost: 25 },
+    protectionFromLoss: { enabled: true },
     visual: { backgroundId: "wood_royal", cubeStyle: "pseudo3d", showDebugGrid: false }
   },
 
@@ -283,9 +283,9 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     boosters: {
       collectAll: { enabled: true, initialCount: 1 },
       multiplier: { enabled: true, initialCount: 1, multiplierValue: 2, duration: "until_level_end" },
-      hammer: { enabled: true, initialCount: 2, areaRows: 4, areaCols: 4 }
+      hammer: { enabled: true, initialCount: 2 }
     },
-    protectionFromLoss: { enabled: true, clearBoardCost: 30 },
+    protectionFromLoss: { enabled: true },
     visual: { backgroundId: "wood_classic", cubeStyle: "pseudo3d", showDebugGrid: false }
   },
 
@@ -305,9 +305,9 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     boosters: {
       collectAll: { enabled: true, initialCount: 2 },
       multiplier: { enabled: true, initialCount: 2, multiplierValue: 3, duration: "until_level_end" },
-      hammer: { enabled: true, initialCount: 3, areaRows: 4, areaCols: 4 }
+      hammer: { enabled: true, initialCount: 3 }
     },
-    protectionFromLoss: { enabled: true, clearBoardCost: 30 },
+    protectionFromLoss: { enabled: true },
     visual: { backgroundId: "wood_dark", cubeStyle: "pseudo3d", showDebugGrid: false }
   },
 
@@ -329,9 +329,9 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     boosters: {
       collectAll: { enabled: true, initialCount: 2 },
       multiplier: { enabled: true, initialCount: 1, multiplierValue: 2, duration: "until_level_end" },
-      hammer: { enabled: true, initialCount: 2, areaRows: 4, areaCols: 4 }
+      hammer: { enabled: true, initialCount: 2 }
     },
-    protectionFromLoss: { enabled: true, clearBoardCost: 35 },
+    protectionFromLoss: { enabled: true },
     visual: { backgroundId: "wood_royal", cubeStyle: "pseudo3d", showDebugGrid: false }
   },
 
@@ -351,9 +351,9 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     boosters: {
       collectAll: { enabled: true, initialCount: 1 },
       multiplier: { enabled: true, initialCount: 1, multiplierValue: 2, duration: "until_level_end" },
-      hammer: { enabled: true, initialCount: 2, areaRows: 3, areaCols: 3 }
+      hammer: { enabled: true, initialCount: 2 }
     },
-    protectionFromLoss: { enabled: true, clearBoardCost: 35 },
+    protectionFromLoss: { enabled: true },
     visual: { backgroundId: "wood_classic", cubeStyle: "pseudo3d", showDebugGrid: false }
   },
 
@@ -376,9 +376,9 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     boosters: {
       collectAll: { enabled: true, initialCount: 2 },
       multiplier: { enabled: true, initialCount: 2, multiplierValue: 2, duration: "until_level_end" },
-      hammer: { enabled: true, initialCount: 3, areaRows: 4, areaCols: 4 }
+      hammer: { enabled: true, initialCount: 3 }
     },
-    protectionFromLoss: { enabled: true, clearBoardCost: 40 },
+    protectionFromLoss: { enabled: true },
     visual: { backgroundId: "wood_dark", cubeStyle: "pseudo3d", showDebugGrid: false }
   },
 
@@ -402,9 +402,9 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     boosters: {
       collectAll: { enabled: true, initialCount: 3 },
       multiplier: { enabled: true, initialCount: 2, multiplierValue: 3, duration: "until_level_end" },
-      hammer: { enabled: true, initialCount: 3, areaRows: 4, areaCols: 4 }
+      hammer: { enabled: true, initialCount: 3 }
     },
-    protectionFromLoss: { enabled: true, clearBoardCost: 50 },
+    protectionFromLoss: { enabled: true },
     visual: { backgroundId: "wood_royal", cubeStyle: "pseudo3d", showDebugGrid: false }
   }
 ];

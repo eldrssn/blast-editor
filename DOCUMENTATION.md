@@ -96,9 +96,9 @@ type LevelConfig = {
   boosters: {
     collectAll: { enabled: boolean; initialCount: number };
     multiplier: { enabled: boolean; initialCount: number; multiplierValue: number; duration: "until_level_end" };
-    hammer:     { enabled: boolean; initialCount: number; areaRows: number; areaCols: number };
+    hammer:     { enabled: boolean; initialCount: number };  // зона действия фиксирована 4×4 (HAMMER_AREA_SIZE), не настраивается
   };
-  protectionFromLoss: { enabled: boolean; clearBoardCost: number };
+  protectionFromLoss: { enabled: boolean };  // тест-сборка: очистка поля бесплатна, стоимости нет
   visual: {
     backgroundId: string;   // фон фиксирован (в редакторе не меняется), берётся из дефолтов
     cubeStyle: "pseudo3d";  // единственный стиль (в редакторе не меняется)
@@ -148,7 +148,7 @@ type LevelConfig = {
 
 Zustand. `GameStoreState = GameState & экшены`.
 
-Экшены: `initGame(config)` (создаёт борд+набор, сбрасывает счёт/множитель/инвентарь), `setStatus/setBoard/setCurrentFigures/setScore/setActiveBooster`, `useBooster(type)` (списывает заряд если >0), `activateMultiplier()` (идемпотентен: no-op если не playing / уже активен / нет зарядов), `clearBoardAndContinue()` (защита от поражения: полностью чистит борд, при необходимости генерит новый набор, списывает `clearBoardCost` из счёта, **очки за защитную очистку не начисляются**).
+Экшены: `initGame(config)` (создаёт борд+набор, сбрасывает счёт/множитель/инвентарь), `setStatus/setBoard/setCurrentFigures/setScore/setActiveBooster`, `useBooster(type)` (списывает заряд если >0), `activateMultiplier()` (идемпотентен: no-op если не playing / уже активен / нет зарядов), `clearBoardAndContinue()` (защита от поражения: полностью чистит борд, при необходимости генерит новый набор; **тест-сборка: очистка бесплатна — очки не списываются и не начисляются**). Сама анимация исчезновения кубиков проигрывается отдельно — см. `GameScene.playBoardClear` (§6), стор только опустошает борд по завершении.
 
 ---
 
@@ -166,13 +166,13 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 ```
 
 - **GameApplication** — владеет `Application`, монтирует canvas, `ResizeObserver` с rAF-коалесингом, letterbox-масштаб сцены (`scale = min(scaleX, scaleY)`), DPR cap = 2, `antialias` всегда включён. Прокси-методы: `collectAll/enterHammerMode/confirmHammerMode/exitHammerMode/setTickerActive/applyVisualConfig/updateState`.
-- **GameScene** — оркестратор. Держит `board/figures/score/isMultiplierActive/multiplierValue`. Здесь вся **placement-логика** (`handlePlacementAttempt` → `handlePlacementSuccess` → `awardAndAnimateClear` → `afterClear`/`resolvePostMove`) и **исполнение бустеров** (`collectAll`, `applyHammerAt`). Единый `Ticker` гоняет левитацию + анимацию HUD + рамку молотка; `setTickerActive(false)` останавливает его на оверлеях.
+- **GameScene** — оркестратор. Держит `board/figures/score/isMultiplierActive/multiplierValue`. Здесь вся **placement-логика** (`handlePlacementAttempt` → `handlePlacementSuccess` → `awardAndAnimateClear` → `afterClear`/`resolvePostMove`) и **исполнение бустеров** (`collectAll`, `applyHammerAt`). `playBoardClear(onComplete)` — анимированная защитная очистка: собирает `filled`-клетки, опустошает борд визуально и проигрывает `EffectsLayer.playCellsVanish` (поп-кубы **без** воды/очков); фактический wipe+регенерацию делает стор в `onComplete` (проброшен из [GameApplication](src/widgets/game-core/pixi/GameApplication.ts) → [GameCore](src/widgets/game-core/ui/GameCore.tsx)). Единый `Ticker` гоняет левитацию + анимацию HUD + рамку молотка; `setTickerActive(false)` останавливает его на оверлеях.
   - `applyVisualConfig(config)` — горячее применение **косметики** (фон, лейбл уровня, targetScore, multiplierValue, `showDebugGrid`) без перестройки сцены.
 - **BoardLayer** — сетка, пул кубов (`acquireCube`), `showHighlight` (зелёный/красный placement), `showHammerArea`+`tickHammer` (пульсация рамки), `getGridInfo()` (cellSize/offset — единый источник координат), `setShowDebugGrid(bool)`/`renderDebugGrid` (отладочная сетка границ клеток поверх поля).
-- **FigureLayer** — слоты внизу, `updateLevitation`, drag-and-drop (`onFigurePointerDown/onPointerMove/onPointerUp`), `getGridPositionFromPointer`, `playBounceAnimation`, `animateReturnToSlot`. Колбэки в сцену: `getGridInfo/canPlaceAt/onHighlightUpdate/onPlacementAttempt/onPlacementSuccess`. `FigureLayer.slotHeight` / `FigureLayer.boosterBand` — статик. **Идемпотентный `draw`:** через `renderedKeys[slot]` (uid фигуры) графика слота пересоздаётся только при смене фигуры — посторонние ре-рендеры (board/score за одну установку) больше не пересоздают неизменные фигуры и не сбрасывают их левитацию (был «прыжок» при установке). Перетаскивание сбрасывает ключ слота (`redrawSlotWithoutFigure`).
-- **EffectsLayer** — `playLineClear` (pop-кубы + капли воды `spawnDroplet`/`spawnSplash` летят в HUD + combo-лейбл `showCombo` при ≥2 линий). Свой tween-loop, пул графики. Эффекты всегда включены (тумблера нет).
+- **FigureLayer** — слоты внизу, `updateLevitation`, drag-and-drop (`onFigurePointerDown/onPointerMove/onPointerUp`), `getGridPositionFromPointer`, `playBounceAnimation`, `animateReturnToSlot`. Колбэки в сцену: `getGridInfo/canPlaceAt/onHighlightUpdate/onPlacementAttempt/onPlacementSuccess`. `FigureLayer.slotHeight` / `FigureLayer.boosterBand` — статик. **Идемпотентный `draw`:** через `renderedKeys[slot]` (uid фигуры) графика слота пересоздаётся только при смене фигуры — посторонние ре-рендеры (board/score за одну установку) больше не пересоздают неизменные фигуры и не сбрасывают их левитацию (был «прыжок» при установке). Перетаскивание сбрасывает ключ слота (`redrawSlotWithoutFigure`). **Спавн-анимация:** новые фигуры (новые `uid` — initGame/регенерация) появляются «попом» (scale 0→1 `easeOutBack` + fade) со stagger'ом `SPAWN_STAGGER_MS` между слотами; `seenUids` гарантирует, что возврат той же фигуры в слот после неудачного дропа не анимируется повторно (`playSpawnAnimation`).
+- **EffectsLayer** — `playLineClear` (pop-кубы + капли воды `spawnDroplet`/`spawnSplash` летят в HUD + combo-лейбл `showCombo` при ≥2 линий) и `playCellsVanish` (те же поп-кубы **без** воды/очков — для защитной очистки поля). Общий поп вынесен в `popCube`. Свой tween-loop, пул графики. Эффекты всегда включены (тумблера нет).
 - **HudLayer** — прогресс-бар воды + счёт `0/target`, лейбл уровня (`formatLevelLabel(levelId)` → «Уровень N», число берётся из `levelId`), `tick` (плавный счётчик), `pulse`, `snapScore`, `getWaterTargetPoint()` (цель для капель), x2-индикатор при активном множителе.
-- **HammerController** — только ввод режима молотка: `enter/confirm/cancel`, отслеживание области под указателем, размер из `config.boosters.hammer.areaRows/Cols`. На тач-экранах `pointerup` больше не применяет бустер: область выбирается жестом, а применение вызывается отдельно через `confirm()` → `GameScene.applyHammerAt`.
+- **HammerController** — только ввод режима молотка: `enter/confirm/cancel`, отслеживание области под указателем; размер зоны **всегда 4×4** (экспортируемая константа `HAMMER_AREA_SIZE`, на маленьких полях клампится к размеру поля) — больше не берётся из конфига. На тач-экранах `pointerup` больше не применяет бустер: область выбирается жестом, а применение вызывается отдельно через `confirm()` → `GameScene.applyHammerAt`.
 - **cube.ts / cubeContext.ts** — `drawPseudo3DCube` (основной цвет, тёмная нижняя грань, highlight, тень, скругление `CORNER_RADIUS=5`, `DEPTH=5`); `getCubeContext` кэширует `GraphicsContext` по `цвет+размер`.
 
 ### Бустеры — логика consume
@@ -191,7 +191,7 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 - **useLevelEditor.ts** — общая логика и для `/editor`, и для `/`. Разделяет **`editConfig`** (то, что редактируется) и **`appliedConfig`** (то, что играется в preview/на главной). Игра обновляется только после **«Применить»**; выбор шаблона и импорт JSON меняют только draft редактора. `validationErrors` выводятся через `useMemo` из `editConfig`. JSON-зеркало (`jsonText`) синхронизируется; ручной ввод JSON парсится «на лету» (сохраняет сырой текст, при ошибке — `jsonError`). Toast вместо `alert`.
   - Хэндлеры: `handleTemplateChange` (выбор из `DEFAULT_LEVELS` или `"custom"`), `handleConfigChange`, `handleApply` (возвращает `boolean` успеха), `handleReset`, `handleCopyJson` (clipboard), `handleImportJson`, `handleJsonChange`.
 - **EditorForm.tsx** — композиция 8 секций (`sections/`):
-  `TemplateSection` (выбор шаблона по `levelId`) · `MainParamsSection` (levelId/targetScore/grid — без названия уровня) · `InitialBoardSection` (интерактивная сетка: клик включает/выключает блок + цвет; кисти воды нет — все блоки «с водой») · `FiguresSection` (availableShapeIds + spawnWeights, каждая фигура показана мини-превью через [FigurePreview.tsx](src/widgets/level-editor/ui/FigurePreview.tsx); доступные фигуры идут сеткой `4` в ряд, веса генерации — `2` в ряд) · `BoostersSection` (enabled/count/multiplierValue/hammer area) · `ProtectionSection` (enabled + clearBoardCost) · `VisualSection` (только `showDebugGrid`; фон и стиль кубиков всегда фиксированы) · `JsonSection` (textarea + ошибки + Импорт).
+  `TemplateSection` (выбор шаблона по `levelId`) · `MainParamsSection` (levelId/targetScore/grid — без названия уровня) · `InitialBoardSection` (интерактивная сетка: клик включает/выключает блок + цвет; кисти воды нет — все блоки «с водой») · `FiguresSection` (availableShapeIds + spawnWeights, каждая фигура показана мини-превью через [FigurePreview.tsx](src/widgets/level-editor/ui/FigurePreview.tsx); доступные фигуры идут сеткой `4` в ряд, веса генерации — `2` в ряд) · `BoostersSection` (enabled/count/multiplierValue; зона молотка показана как «4 × 4 (фиксировано)», не редактируется) · `ProtectionSection` (только тумблер enabled — поле стоимости очистки убрано) · `VisualSection` (только `showDebugGrid`; фон и стиль кубиков всегда фиксированы) · `JsonSection` (textarea + ошибки + Импорт).
 - **[FigurePreview.tsx](src/widgets/level-editor/ui/FigurePreview.tsx)** — чистый React/CSS-grid компонент: по `shapeId` берёт геометрию из `FIGURE_SHAPES` и рисует мини-фигуру (без Pixi). Используется в `FiguresSection` в списке выбора и рядом с весами.
 
 ### GameCore ↔ редактор: ключевая оптимизация
@@ -199,14 +199,14 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 - **`structuralKey`** (`useMemo`) = grid, targetScore, initialBoard, figures, protectionFromLoss, booster counts/enabled → при изменении **полная перестройка Pixi + рестарт уровня**.
 - **косметика** (levelId/лейбл уровня, `visual.showDebugGrid`, multiplierValue) → `applyVisualConfig` **горячо**, без сброса прогресса.
 
-Оверлеи в GameCore: **победа** (status `won`), **поражение** (`lost`), **защита от поражения** (`protection_from_loss` — «Короб заполнен»/«Нет доступных ходов», кнопка очистки с учётом `clearBoardCost` и проверкой `canAffordClear`), **подтверждение бустера** (`pendingBooster` для collectAll/multiplier — «Применить»/«Отмена», см. §6). Для молотка вместо модалки показывается inline-панель выбора с теми же действиями.
+Оверлеи в GameCore: **победа** (status `won`), **поражение** (`lost`), **защита от поражения** (`protection_from_loss` — «Короб заполнен»/«Нет доступных ходов», выбор «Очистить поле и продолжить» (бесплатно, с анимацией исчезновения через `playBoardClear`) / «Завершить уровень» → экран `lost`; стоимости/`canAffordClear` больше нет), **подтверждение бустера** (`pendingBooster` для collectAll/multiplier — «Применить»/«Отмена», см. §6). Для молотка вместо модалки показывается inline-панель выбора с теми же действиями.
 
 ---
 
 ## 8. Конфиги и контент
 
 - **[figureShapes.ts](src/entities/game/config/figureShapes.ts)** — `FIGURE_SHAPES` (15 фигур, id `"1"`…`"15"`) + `DEFAULT_FIGURE_WEIGHTS` (веса спавна; `"1"`=16 … `"15"`=1).
-- **[defaultLevels.ts](src/entities/game/config/defaultLevels.ts)** — **15 уровней** (`level_1`…`level_15`, без поля `title`), все уровни используют поле **`8×8`**; кривая сложности строится через `targetScore`, число и крупность фигур, плотность препятствий и стоимость защиты; инвентарь бустеров беднеет, фоны циклятся classic/dark/royal. Препятствия рисуются хелпером `paintBoard(rows, cols, set => …)` (out-of-bounds игнорируется).
+- **[defaultLevels.ts](src/entities/game/config/defaultLevels.ts)** — **15 уровней** (`level_1`…`level_15`, без поля `title`), все уровни используют поле **`8×8`**; кривая сложности строится через `targetScore`, число и крупность фигур, плотность препятствий; защита от поражения у всех включена и **бесплатна** (стоимость очистки убрана); инвентарь бустеров беднеет, фоны циклятся classic/dark/royal. Препятствия рисуются хелпером `paintBoard(rows, cols, set => …)` (out-of-bounds игнорируется).
   - `level_1` target 60 (8×8) · `level_2` 120 · `level_3` 200 — исходное «ядро».
   - `level_4`–`level_8`: 90→200, чистое поле → углы/полоса/блоки 2×2 на `8×8`.
   - `level_9`–`level_12`: 240→360, только крупные фигуры / диагонали / рассыпка, но всё ещё на `8×8`.
@@ -240,10 +240,12 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 | Кламп очков по цели | `GameScene.awardAndAnimateClear` (`onScoreArrive`) |
 | Внешний вид куба | `pixi/cube.ts`, `pixi/cubeContext.ts` |
 | Фон | `pixi/BackgroundLayer.ts` (ровная светло-коричневая заливка) |
-| Анимации очистки/воды | `pixi/EffectsLayer.ts` |
+| Анимации очистки/воды | `pixi/EffectsLayer.ts` (`playLineClear`/`playCellsVanish`/`popCube`) |
+| Анимированная защитная очистка поля | `GameScene.playBoardClear` + `GameApplication.playBoardClear` + `GameCore.handleProtectionClear` |
+| Спавн-анимация фигур внизу | `pixi/FigureLayer.ts` (`playSpawnAnimation`, `seenUids`) |
 | HUD / прогресс-бар | `pixi/HudLayer.ts` |
 | Drag-and-drop | `pixi/FigureLayer.ts` |
-| Молоток (выбор области) | `pixi/HammerController.ts` + `BoardLayer.showHammerArea` |
+| Молоток (выбор области) | `pixi/HammerController.ts` (`HAMMER_AREA_SIZE` = 4×4) + `BoardLayer.showHammerArea` |
 | Поля формы редактора | `widgets/level-editor/ui/sections/*` |
 | Мини-превью фигур в редакторе | `widgets/level-editor/ui/FigurePreview.tsx` |
 | Лейбл уровня в игре («Уровень N») | `pixi/HudLayer.ts` (`formatLevelLabel`) |
@@ -267,6 +269,10 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 7. **Все бустеры требуют явного подтверждения**: «Собрать всё» и «Множитель» — в модальном окне, молоток — отдельной кнопкой `Применить` в режиме выбора; множитель не блокирует другие бустеры.
 8. **Порядок раскладки сцены** изменён на HUD → поле → фигуры → бустеры (бар бустеров перенесён вниз, зарезервирована полоса `BOOSTER_BAND`).
 9. **Уровней стало 15** (было 3): добавлены `level_4`…`level_15` с прогрессией сложности (см. §8).
+10. **Поле `clearBoardCost` удалено** из `protectionFromLoss` (тип, валидация, normalize, все 15 уровней, секция редактора). Тест-сборка: защитная очистка поля **бесплатна** — очки не списываются. Экран конца ходов даёт выбор «Очистить поле и продолжить» / «Завершить уровень» (→ существующий экран «Поражение»).
+11. **Анимация защитной очистки поля**: при «Очистить поле» кубики исчезают поп-анимацией (`EffectsLayer.playCellsVanish` через `GameScene.playBoardClear`) — как при очистке линий, но **без** капель воды и начисления очков.
+12. **Спавн-анимация фигур**: три фигуры внизу появляются «попом» со stagger'ом (`FigureLayer.playSpawnAnimation`, гейт по `seenUids`) при старте уровня и регенерации набора.
+13. **Зона молотка зафиксирована 4×4** для всех уровней. Поля `areaRows/areaCols` удалены из `boosters.hammer` (тип, валидация, normalize, все 15 уровней, контролы редактора). Размер задаётся константой `HAMMER_AREA_SIZE` в [HammerController.ts](src/widgets/game-core/pixi/HammerController.ts) (на полях меньше 4 клампится к размеру поля).
 
 Что было унифицировано в ту сессию (для истории):
 1. Next.js зафиксирован как **16** (был «15+» в ТЗ).

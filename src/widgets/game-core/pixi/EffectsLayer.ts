@@ -164,9 +164,6 @@ export class EffectsLayer extends Container {
       this.showCombo(comboCount, grid);
     }
 
-    const cellFull = grid.cellSize + grid.gap;
-    const size = grid.cellSize;
-
     // Scale the decorative droplets down for big clears so a full-board Collect
     // All doesn't spawn hundreds of particles at once on weak devices.
     const decorativePerCell = cells.length > 24 ? 0 : cells.length > 12 ? 1 : 2;
@@ -186,37 +183,75 @@ export class EffectsLayer extends Container {
     };
 
     cells.forEach((cell, i) => {
-      const cx = grid.boardOffsetX + cell.col * cellFull + size / 2;
-      const cy = grid.boardOffsetY + cell.row * cellFull + size / 2;
-      const color = cell.color ?? "#5eb1ff";
-      const stagger = i * 14;
-
-      const cube = new Graphics(getCubeContext(color, size));
-      cube.pivot.set(size / 2, size / 2);
-      cube.position.set(cx, cy);
-      this.addChild(cube);
-
-      this.addTween({
-        duration: 300,
-        delay: stagger,
-        ease: easeInCubic,
-        onUpdate: (t) => {
-          // Pop up to 1.25x in the first third, then collapse to 0.
-          const scale = t < 0.35 ? 1 + (t / 0.35) * 0.25 : 1.25 * (1 - (t - 0.35) / 0.65);
-          cube.scale.set(Math.max(scale, 0));
-          cube.alpha = 1 - Math.max(0, (t - 0.4) / 0.6);
-          cube.rotation = t * 0.35;
-        },
-        onDone: () => {
-          cube.destroy();
-          // Scoring droplet (drives accounting).
-          this.spawnDroplet(cx, cy, target, onLand, false);
-          // A few decorative droplets for splashiness (capped for big clears).
-          for (let d = 0; d < decorativePerCell; d++) {
-            this.spawnDroplet(cx, cy, target, undefined, true);
-          }
-        },
+      this.popCube(cell, grid, i * 14, (cx, cy) => {
+        // Scoring droplet (drives accounting).
+        this.spawnDroplet(cx, cy, target, onLand, false);
+        // A few decorative droplets for splashiness (capped for big clears).
+        for (let d = 0; d < decorativePerCell; d++) {
+          this.spawnDroplet(cx, cy, target, undefined, true);
+        }
       });
+    });
+  }
+
+  /**
+   * Vanish a set of cells with the same cube-pop as a line clear, but WITHOUT
+   * the water droplets / score animation. Used by the protection-from-loss board
+   * clear, which wipes the board for free (no points), so nothing flies to the HUD.
+   * `onComplete` fires once every cube has popped.
+   */
+  playCellsVanish(cells: ClearedCellCoord[], grid: GridInfo, onComplete?: () => void) {
+    if (cells.length === 0) {
+      onComplete?.();
+      return;
+    }
+
+    let remaining = cells.length;
+    cells.forEach((cell, i) => {
+      this.popCube(cell, grid, i * 14, () => {
+        remaining -= 1;
+        if (remaining <= 0) onComplete?.();
+      });
+    });
+  }
+
+  /**
+   * Pop a single cell's cube: scale up briefly, then collapse + fade + spin out.
+   * Shared by line clears and the protection board clear. `onDone` receives the
+   * cube center so callers can spawn follow-up effects (e.g. water droplets).
+   */
+  private popCube(
+    cell: ClearedCellCoord,
+    grid: GridInfo,
+    delay: number,
+    onDone: (cx: number, cy: number) => void
+  ) {
+    const cellFull = grid.cellSize + grid.gap;
+    const size = grid.cellSize;
+    const cx = grid.boardOffsetX + cell.col * cellFull + size / 2;
+    const cy = grid.boardOffsetY + cell.row * cellFull + size / 2;
+    const color = cell.color ?? "#5eb1ff";
+
+    const cube = new Graphics(getCubeContext(color, size));
+    cube.pivot.set(size / 2, size / 2);
+    cube.position.set(cx, cy);
+    this.addChild(cube);
+
+    this.addTween({
+      duration: 300,
+      delay,
+      ease: easeInCubic,
+      onUpdate: (t) => {
+        // Pop up to 1.25x in the first third, then collapse to 0.
+        const scale = t < 0.35 ? 1 + (t / 0.35) * 0.25 : 1.25 * (1 - (t - 0.35) / 0.65);
+        cube.scale.set(Math.max(scale, 0));
+        cube.alpha = 1 - Math.max(0, (t - 0.4) / 0.6);
+        cube.rotation = t * 0.35;
+      },
+      onDone: () => {
+        cube.destroy();
+        onDone(cx, cy);
+      },
     });
   }
 

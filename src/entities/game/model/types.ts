@@ -32,13 +32,11 @@ export type LevelConfig = {
     hammer: {
       enabled: boolean;
       initialCount: number;
-      areaRows: number;
-      areaCols: number;
+      // Зона действия молотка фиксирована 4×4 (см. HAMMER_AREA_SIZE), не настраивается.
     };
   };
   protectionFromLoss: {
     enabled: boolean;
-    clearBoardCost: number;
   };
   visual: {
     backgroundId: string;

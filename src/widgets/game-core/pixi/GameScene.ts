@@ -111,10 +111,6 @@ export class GameScene extends Container {
     this.hammer = new HammerController({
       target: this,
       getGridInfo: () => this.boardLayer.getGridInfo(),
-      getAreaSize: () => ({
-        rows: this.config.boosters?.hammer?.areaRows ?? 4,
-        cols: this.config.boosters?.hammer?.areaCols ?? 4,
-      }),
       showArea: (area) => this.boardLayer.showHammerArea(area),
       setFiguresInteractive: (interactive) => {
         this.figureLayer.eventMode = interactive ? "static" : "none";
@@ -314,6 +310,35 @@ export class GameScene extends Container {
     this.awardAndAnimateClear(result, 1, () => this.afterClear());
 
     return true;
+  }
+
+  /**
+   * Protection-from-loss board clear: vanish every filled cell with the cube-pop
+   * animation but WITHOUT any water/score (the clear is free in this build). The
+   * actual board wipe + figure regeneration is done by the store in `onComplete`;
+   * here we only empty the board visually so the popping cubes read on top.
+   */
+  playBoardClear(onComplete: () => void) {
+    const coords: ClearedCellCoord[] = [];
+    this.board.forEach((row, r) =>
+      row.forEach((cell, c) => {
+        if (cell.filled) coords.push({ row: r, col: c, color: cell.color });
+      })
+    );
+
+    if (coords.length === 0) {
+      onComplete();
+      return;
+    }
+
+    // Empty the board logically so the underlying cubes disappear; the popping
+    // cubes are drawn on top by the EffectsLayer (mirrors the line-clear path).
+    this.board = this.board.map((row) =>
+      row.map((cell) => ({ ...cell, filled: false, color: undefined, figureId: undefined }))
+    );
+    this.renderState(this.board, this.figures, this.score);
+
+    this.effectsLayer.playCellsVanish(coords, this.boardLayer.getGridInfo(), onComplete);
   }
 
   /** Enter the hammer selection mode (delegated to HammerController). */

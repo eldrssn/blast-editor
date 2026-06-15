@@ -24,13 +24,6 @@ export default function BoostersSection({ config, onChange }: Props) {
     });
   };
 
-  const handleHammerSizeChange = (field: "areaRows" | "areaCols", val: number) => {
-    onChange({
-      ...config,
-      boosters: { ...config.boosters, hammer: { ...config.boosters.hammer, [field]: val } },
-    });
-  };
-
   const handleMultiplierValChange = (val: number) => {
     onChange({
       ...config,
@@ -121,20 +114,8 @@ export default function BoostersSection({ config, onChange }: Props) {
               />
             </div>
             <div className={styles.field}>
-              <label>Зона: Высота</label>
-              <input
-                type="number"
-                value={config.boosters?.hammer?.areaRows ?? 4}
-                onChange={(e) => handleHammerSizeChange("areaRows", parseInt(e.target.value) || 4)}
-              />
-            </div>
-            <div className={styles.field}>
-              <label>Зона: Ширина</label>
-              <input
-                type="number"
-                value={config.boosters?.hammer?.areaCols ?? 4}
-                onChange={(e) => handleHammerSizeChange("areaCols", parseInt(e.target.value) || 4)}
-              />
+              <label>Зона действия</label>
+              <input type="text" value="4 × 4 (фиксировано)" disabled readOnly />
             </div>
           </div>
         )}
