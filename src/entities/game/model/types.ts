@@ -46,10 +46,6 @@ export type LevelConfig = {
     backgroundId: string;
     cubeStyle: "pseudo3d";
     showDebugGrid: boolean;
-    /** Master toggle for animations/particles (item 12: эффекты отключаемы). */
-    effectsEnabled: boolean;
-    /** Master toggle for Howler sound effects. */
-    soundEnabled: boolean;
   };
 };
 

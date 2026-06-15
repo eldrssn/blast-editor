@@ -43,9 +43,7 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     visual: {
       backgroundId: "wood_classic",
       cubeStyle: "pseudo3d",
-      showDebugGrid: false,
-      effectsEnabled: true,
-      soundEnabled: true
+      showDebugGrid: false
     }
   },
   {
@@ -78,9 +76,7 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     visual: {
       backgroundId: "wood_dark",
       cubeStyle: "pseudo3d",
-      showDebugGrid: false,
-      effectsEnabled: true,
-      soundEnabled: true
+      showDebugGrid: false
     }
   },
   {
@@ -111,9 +107,7 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     visual: {
       backgroundId: "wood_royal",
       cubeStyle: "pseudo3d",
-      showDebugGrid: false,
-      effectsEnabled: true,
-      soundEnabled: true
+      showDebugGrid: false
     }
   }
 ];

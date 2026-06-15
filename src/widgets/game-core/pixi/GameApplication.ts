@@ -37,16 +37,14 @@ export class GameApplication {
 
     // Cap the device pixel ratio: a DPR-3 phone would otherwise render 9× the
     // pixels of a logical one. 2 stays crisp while keeping the fill rate sane on
-    // weak GPUs. Antialias is tied to the effects toggle so the low-end profile
-    // (effects off) also drops MSAA.
+    // weak GPUs.
     const resolution = Math.min(window.devicePixelRatio || 1, 2);
-    const antialias = config.visual?.effectsEnabled !== false;
 
     await this.app.init({
       width: w,
       height: h,
       backgroundColor: 0x1a0f07,
-      antialias,
+      antialias: true,
       resolution,
       autoDensity: true,
     });

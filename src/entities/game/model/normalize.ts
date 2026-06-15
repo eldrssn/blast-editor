@@ -72,10 +72,7 @@ export function normalizeLevelConfig(config: Partial<LevelConfig> | null | undef
   const visual = {
     backgroundId: config?.visual?.backgroundId || "wood_classic",
     cubeStyle: (config?.visual?.cubeStyle || "pseudo3d") as "pseudo3d",
-    showDebugGrid: !!config?.visual?.showDebugGrid,
-    // Both default to enabled (only an explicit `false` turns them off).
-    effectsEnabled: config?.visual?.effectsEnabled !== false,
-    soundEnabled: config?.visual?.soundEnabled !== false
+    showDebugGrid: !!config?.visual?.showDebugGrid
   };
 
   return {

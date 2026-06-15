@@ -63,15 +63,10 @@ export class GameScene extends Container {
   /** External callbacks to notify React/store of state changes */
   callbacks: GameSceneCallbacks | null = null;
 
-  /** Cached from config.visual — drives animations + sound gating. */
-  private effectsEnabled: boolean = true;
-
   constructor(config: LevelConfig) {
     super();
     this.config = config;
     this.multiplierValue = config.boosters?.multiplier?.multiplierValue ?? 2;
-    this.effectsEnabled = config.visual?.effectsEnabled !== false;
-    soundManager.setEnabled(config.visual?.soundEnabled !== false);
     this.sortableChildren = true;
     this.eventMode = "static";
     // Make the whole scene a hit target so the hammer booster can track pointer
@@ -100,10 +95,6 @@ export class GameScene extends Container {
 
     this.effectsLayer = new EffectsLayer();
     this.addChild(this.effectsLayer);
-
-    // Propagate the effects toggle to the layers that own animations.
-    this.figureLayer.effectsEnabled = this.effectsEnabled;
-    this.effectsLayer.effectsEnabled = this.effectsEnabled;
 
     // --- Wire up FigureLayer callbacks ---
     this.figureLayer.getGridInfo = () => this.boardLayer.getGridInfo();
@@ -143,18 +134,13 @@ export class GameScene extends Container {
 
   /**
    * Apply cosmetic / non-structural config changes in place, without rebuilding
-   * the scene or restarting the level: background theme, title, target score,
-   * the multiplier value and the effects/sound toggles. Structural changes
-   * (grid, initial board, figures, booster inventory) still go through a full
-   * rebuild in the React layer.
+   * the scene or restarting the level: background theme, title, target score
+   * and the multiplier value. Structural changes (grid, initial board, figures,
+   * booster inventory) still go through a full rebuild in the React layer.
    */
   applyVisualConfig(config: LevelConfig) {
     this.config = config;
     this.multiplierValue = config.boosters?.multiplier?.multiplierValue ?? 2;
-    this.effectsEnabled = config.visual?.effectsEnabled !== false;
-    this.figureLayer.effectsEnabled = this.effectsEnabled;
-    this.effectsLayer.effectsEnabled = this.effectsEnabled;
-    soundManager.setEnabled(config.visual?.soundEnabled !== false);
     this.background.draw(config, SCENE_W, SCENE_H);
     this.renderState(this.board, this.figures, this.score);
   }

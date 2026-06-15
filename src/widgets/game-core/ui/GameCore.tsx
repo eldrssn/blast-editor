@@ -179,11 +179,6 @@ export default function GameCore({ config }: GameCoreProps) {
     gameAppRef.current.updateState(board, currentFigures, score, isMultiplierActive);
   }, [board, currentFigures, score, isMultiplierActive]);
 
-  // Keep the sound master toggle in sync with the applied config.
-  useEffect(() => {
-    soundManager.setEnabled(config.visual?.soundEnabled !== false);
-  }, [config]);
-
   // Win / lose stingers.
   useEffect(() => {
     if (status === "won") soundManager.play("win");

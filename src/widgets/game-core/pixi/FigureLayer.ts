@@ -57,9 +57,6 @@ export class FigureLayer extends Container {
   /** Guards animation callbacks from touching the layer after teardown. */
   private isDestroyed = false;
 
-  /** When false, idle levitation + bounce are skipped (visual.effectsEnabled). */
-  effectsEnabled: boolean = true;
-
   /** External callbacks */
   onPlacementAttempt: ((event: FigurePlacementEvent) => boolean) | null = null;
   onPlacementSuccess: ((event: FigurePlacementEvent) => void) | null = null;
@@ -190,12 +187,6 @@ export class FigureLayer extends Container {
       const figChild = slot.children[1];
       if (!figChild) continue;
 
-      // Effects off → sit still on the baseline.
-      if (!this.effectsEnabled) {
-        figChild.y = 0;
-        continue;
-      }
-
       const phase = this.levitationPhases[i];
       const t = this.animationFrame * LEVITATION_SPEED + phase;
       figChild.y = Math.sin(t) * LEVITATION_AMPLITUDE;
@@ -288,12 +279,8 @@ export class FigureLayer extends Container {
             dragContainer.destroy({ children: true });
             this.onPlacementSuccess?.(event);
           };
-          // Bounce animation on placement (skipped when effects are disabled).
-          if (this.effectsEnabled) {
-            this.playBounceAnimation(dragContainer, finish);
-          } else {
-            finish();
-          }
+          // Bounce animation on placement.
+          this.playBounceAnimation(dragContainer, finish);
         }
       }
     }

@@ -18,10 +18,6 @@ export default function VisualSection({ config, onChange }: Props) {
     onChange({ ...config, visual: { ...config.visual, showDebugGrid } });
   };
 
-  const handleVisualBoolChange = (field: "effectsEnabled" | "soundEnabled", val: boolean) => {
-    onChange({ ...config, visual: { ...config.visual, [field]: val } });
-  };
-
   return (
     <div className={styles.section}>
       <h3>Визуальное оформление</h3>
@@ -55,24 +51,6 @@ export default function VisualSection({ config, onChange }: Props) {
           onChange={(e) => handleShowDebugChange(e.target.checked)}
         />
         <label htmlFor="showDebugGrid">Показывать сетку отладки (debug grid)</label>
-      </div>
-      <div className={`${styles.field} ${styles.checkboxField}`}>
-        <input
-          type="checkbox"
-          id="effectsEnabled"
-          checked={config.visual?.effectsEnabled !== false}
-          onChange={(e) => handleVisualBoolChange("effectsEnabled", e.target.checked)}
-        />
-        <label htmlFor="effectsEnabled">Анимации и эффекты (левитация, частицы, bounce)</label>
-      </div>
-      <div className={`${styles.field} ${styles.checkboxField}`}>
-        <input
-          type="checkbox"
-          id="soundEnabled"
-          checked={config.visual?.soundEnabled !== false}
-          onChange={(e) => handleVisualBoolChange("soundEnabled", e.target.checked)}
-        />
-        <label htmlFor="soundEnabled">Звуки (Howler)</label>
       </div>
     </div>
   );

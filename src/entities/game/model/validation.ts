@@ -132,15 +132,5 @@ export function validateLevelConfig(config: Partial<LevelConfig> | null | undefi
     }
   }
 
-  // visual (only type-check the optional toggles when present)
-  if (config.visual && typeof config.visual === "object") {
-    if (config.visual.effectsEnabled !== undefined && typeof config.visual.effectsEnabled !== "boolean") {
-      errors.push("Поле visual.effectsEnabled должно быть булевым значением.");
-    }
-    if (config.visual.soundEnabled !== undefined && typeof config.visual.soundEnabled !== "boolean") {
-      errors.push("Поле visual.soundEnabled должно быть булевым значением.");
-    }
-  }
-
   return errors;
 }

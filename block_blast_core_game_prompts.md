@@ -1,5 +1,15 @@
 # Промпты для агента: создание core-игры Block Blast + редактор уровней
 
+> ⚠️ **Это исходные промпты (история замысла). Единая правда о реализации — [DOCUMENTATION.md](DOCUMENTATION.md).**
+> Документ выверен по коду на 2026-06-15: стек, сигнатуры функций, звук и архитектура ниже приведены в соответствие с фактом. При расхождении верь коду + DOCUMENTATION.md. Правила работы агента — [CLAUDE.md](CLAUDE.md) / [AGENTS.md](AGENTS.md).
+>
+> Ключевые факты реализации (детали — в DOCUMENTATION.md):
+> - **Эффекты** всегда включены (тумблера `visual.effectsEnabled` нет); поля `effectsEnabled`/`soundEnabled` в `visual` отсутствуют.
+> - **Звук** — заглушка `soundManager` под реальные аудио-файлы (`public/sounds/`), пока не играет; включением управляет хост-приложение, а не конфиг.
+> - **Логика** распределена: чистые функции в `entities/game/lib`, мутации состояния — в `gameStore.ts` (Zustand) и `GameScene.ts`.
+> - **Конфиг preview** применяется через разделение **структурных** (полный ребилд + рестарт) и **косметических** (горячо, без сброса) изменений — см. `GameCore.tsx`.
+> - **Форма редактора** разбита на 8 секций в `widgets/level-editor/ui/sections/`.
+
 ## 0. Общий контекст проекта
 
 Нужно создать **core-игру в стиле Block Blast** для мобильного WebView.
@@ -24,7 +34,7 @@
 
 ```json
 {
-  "next": "15+",
+  "next": "16+",
   "react": "19+",
   "typescript": "5+",
   "pixi.js": "8+",
@@ -33,6 +43,8 @@
   "howler": "2+"
 }
 ```
+
+> Фактически в проекте: Next.js `16.2.9`, React `19.2.4` (см. [package.json](package.json)).
 
 Для самой игры использовать **Pixi.js**.  
 Для редактора уровней использовать **React UI**.
@@ -838,23 +850,30 @@ src/
 
 # Game logic functions
 
-Нужно реализовать чистые функции:
+Чистые функции (актуальные сигнатуры, как в `entities/game/lib`):
 
 ```ts
-createEmptyBoard(rows: number, cols: number): BoardCell[][];
-canPlaceFigure(board: BoardCell[][], figure: FigureShape, origin: GridPosition): boolean;
-placeFigure(board: BoardCell[][], figure: FigureInstance, origin: GridPosition): BoardCell[][];
+// board.ts
+createEmptyBoard(rows: number, cols: number, initialBoard?: Array<Array<BoardCellConfig|null>>): BoardCell[][];
+canPlaceFigure(board: BoardCell[][], figure: FigureInstance, row: number, col: number): boolean;
+placeFigure(board: BoardCell[][], figure: FigureInstance, row: number, col: number): BoardCell[][];
 findCompletedLines(board: BoardCell[][]): CompletedLine[];
 clearCompletedLines(board: BoardCell[][], lines: CompletedLine[]): ClearResult;
-calculateScore(params: CalculateScoreParams): number;
 canPlaceAnyFigure(board: BoardCell[][], figures: FigureInstance[]): boolean;
-generateFigureSet(config: LevelConfig): FigureInstance[];
-applyCollectAllBooster(state: GameState): GameState;
-applyHammerBooster(state: GameState, area: HammerArea): GameState;
-activateMultiplierBooster(state: GameState): GameState;
-checkWinCondition(state: GameState): boolean;
-checkLoseCondition(state: GameState): boolean;
+// figures.ts
+generateFigureSet(config: LevelConfig, board?: BoardCell[][]): FigureInstance[];
+// scoring.ts
+calculateScore(params: CalculateScoreParams): number;
+checkWinCondition(score: number, targetScore: number): boolean;
+checkLoseCondition(board: BoardCell[][], figures: FigureInstance[]): boolean;
+// boosters.ts (работают с board, не с GameState)
+applyCollectAll(board: BoardCell[][]): { board; clearedCellsCount; clearedCellCoords };
+applyHammer(board: BoardCell[][], area: HammerArea): { board; clearedCellsCount; clearedCellCoords };
+// gameFlow.ts — post-move резолвер (win / regenerate / lose / protection)
+resolvePostMove(board, figures, score, config): { outcome; figures; regenerated };
 ```
+
+> Мутации, завязанные на `GameState`, реализованы **не** чистыми функциями, а в Zustand-сторе ([gameStore.ts](src/widgets/game-core/model/gameStore.ts)): `activateMultiplier`, `clearBoardAndContinue`, `useBooster` и т.д. Исполнение бустеров с анимацией — в [GameScene.ts](src/widgets/game-core/pixi/GameScene.ts).
 
 ---
 
@@ -1165,15 +1184,13 @@ type GameState = {
 8. Улучшить water particles animation.
 9. Улучшить hammer 4×4 highlight.
 10. Улучшить multiplier active state.
-11. Добавить простые звуки через howler:
-    - pick;
-    - place;
-    - invalid;
-    - line clear;
-    - booster;
-    - win;
-    - lose.
-12. Все эффекты должны быть отключаемыми через debug/visual config.
+11. Звук через howler (события: pick, place, invalid, line clear, booster, win, lose).
+    Реализовано как заглушка `soundManager`: вызовы расставлены по коду, но реальных
+    аудио-файлов пока нет → `play()` ничего не проигрывает. Чтобы включить — положить
+    файлы в `public/sounds/` и заполнить `SOUND_FILES` в `shared/lib/sound.ts`.
+    Включением звука управляет хост-приложение, тумблера в конфиге нет.
+12. Эффекты (левитация, частицы, bounce, line clear, water) **всегда включены** —
+    отдельного тумблера `visual.effectsEnabled` нет (убран намеренно). Антиалиасинг тоже всегда включён.
 ```
 
 ---

@@ -51,8 +51,6 @@ export class EffectsLayer extends Container {
   private rafId: number | null = null;
   private lastTime = 0;
   private isDestroyed = false;
-  /** When false, animations are skipped and scoring hooks fire immediately. */
-  effectsEnabled = true;
 
   /**
    * Pool of reusable Graphics for water droplets + splash rings. Pooling avoids
@@ -157,13 +155,6 @@ export class EffectsLayer extends Container {
     hooks: LineClearHooks
   ) {
     if (cells.length === 0) {
-      hooks.onScoreArrive?.();
-      hooks.onComplete?.();
-      return;
-    }
-
-    // Effects disabled: award score + resolve instantly, no animation.
-    if (!this.effectsEnabled) {
       hooks.onScoreArrive?.();
       hooks.onComplete?.();
       return;
