@@ -153,8 +153,8 @@ type BoardCell = {
   filled: boolean;
   color?: string;
   figureId?: string;
-  hasWater?: boolean;
 };
+// Поле hasWater убрано: все кубики считаются «с водой».
 ```
 
 ---
@@ -717,7 +717,7 @@ const totalScore = removedCellsCount * boosterMultiplier;
 ```ts
 type LevelConfig = {
   levelId: string;
-  title: string;
+  // Поле title убрано: в игре показывается «Уровень N» (N берётся из levelId).
 
   grid: {
     rows: number;
@@ -759,9 +759,9 @@ type LevelConfig = {
   };
 
   visual: {
-    backgroundId: string;
-    cubeStyle: "pseudo3d";
-    showDebugGrid: boolean;
+    backgroundId: string;   // фиксирован, в редакторе не выбирается
+    cubeStyle: "pseudo3d";  // фиксирован, в редакторе не выбирается
+    showDebugGrid: boolean; // рабочий тумблер отладочной сетки поля
   };
 };
 ```
@@ -1122,18 +1122,17 @@ type GameState = {
 2. Select выбора шаблона DEFAULT_LEVELS.
 3. Форма редактирования:
    - levelId;
-   - title;
    - targetScore;
    - rows;
    - cols;
-   - доступные фигуры;
+   - доступные фигуры (с мини-превью);
    - spawnWeights;
    - booster counts;
    - multiplier value;
    - hammer area size;
    - protectionFromLoss enabled;
    - clearBoardCost;
-   - visual options.
+   - visual options (только showDebugGrid).
 4. Кнопки:
    - Применить;
    - Сбросить;
@@ -1320,7 +1319,6 @@ Editor:
 
 LevelConfig:
 - levelId;
-- title;
 - grid rows/cols;
 - targetScore;
 - initialBoard;

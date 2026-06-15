@@ -17,7 +17,6 @@ export function createEmptyBoard(
         id: `${r}-${c}`,
         filled: initialCell ? initialCell.filled : false,
         color: initialCell?.color,
-        hasWater: initialCell ? initialCell.hasWater : false,
       });
     }
     board.push(row);
@@ -142,14 +141,12 @@ export function clearCompletedLines(board: BoardCell[][], lines: CompletedLine[]
           row: rowIdx,
           col: colIdx,
           color: cell.color,
-          hasWater: cell.hasWater,
         });
         return {
           ...cell,
           filled: false,
           color: undefined,
           figureId: undefined,
-          hasWater: false,
         };
       }
       return { ...cell };

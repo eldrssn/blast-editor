@@ -10,10 +10,6 @@ type Props = {
 };
 
 export default function VisualSection({ config, onChange }: Props) {
-  const handleVisualChange = (field: "backgroundId" | "cubeStyle", val: string) => {
-    onChange({ ...config, visual: { ...config.visual, [field]: val } });
-  };
-
   const handleShowDebugChange = (showDebugGrid: boolean) => {
     onChange({ ...config, visual: { ...config.visual, showDebugGrid } });
   };
@@ -21,28 +17,6 @@ export default function VisualSection({ config, onChange }: Props) {
   return (
     <div className={styles.section}>
       <h3>Визуальное оформление</h3>
-      <div className={styles.row}>
-        <div className={styles.field}>
-          <label>Идентификатор фона</label>
-          <select
-            value={config.visual?.backgroundId || "wood_classic"}
-            onChange={(e) => handleVisualChange("backgroundId", e.target.value)}
-          >
-            <option value="wood_classic">Классическое дерево</option>
-            <option value="wood_dark">Темное дерево</option>
-            <option value="wood_royal">Королевское дерево</option>
-          </select>
-        </div>
-        <div className={styles.field}>
-          <label>Стиль кубиков</label>
-          <select
-            value={config.visual?.cubeStyle || "pseudo3d"}
-            onChange={(e) => handleVisualChange("cubeStyle", e.target.value)}
-          >
-            <option value="pseudo3d">Псевдо-3D</option>
-          </select>
-        </div>
-      </div>
       <div className={`${styles.field} ${styles.checkboxField}`}>
         <input
           type="checkbox"

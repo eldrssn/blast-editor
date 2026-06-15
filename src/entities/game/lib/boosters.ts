@@ -18,15 +18,13 @@ export function applyCollectAll(board: BoardCell[][]): {
           row: r,
           col: c,
           color: cell.color,
-          hasWater: cell.hasWater,
         });
-        
+
         return {
           ...cell,
           filled: false,
           color: undefined,
           figureId: undefined,
-          hasWater: false,
         };
       }
       return { ...cell };
@@ -67,7 +65,6 @@ export function applyHammer(
           row: r,
           col: c,
           color: cell.color,
-          hasWater: cell.hasWater,
         });
 
         return {
@@ -75,7 +72,6 @@ export function applyHammer(
           filled: false,
           color: undefined,
           figureId: undefined,
-          hasWater: false,
         };
       }
       return { ...cell };

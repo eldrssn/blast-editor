@@ -3,12 +3,10 @@ export type BoosterType = "collectAll" | "multiplier" | "hammer";
 export type BoardCellConfig = {
   filled: boolean;
   color?: string;
-  hasWater?: boolean;
 };
 
 export type LevelConfig = {
   levelId: string;
-  title: string;
   grid: {
     rows: number;
     cols: number;
@@ -54,7 +52,6 @@ export type BoardCell = {
   filled: boolean;
   color?: string;
   figureId?: string;
-  hasWater?: boolean;
 };
 
 export type FigureCell = {
@@ -112,7 +109,6 @@ export type ClearedCellCoord = {
   row: number;
   col: number;
   color?: string;
-  hasWater?: boolean;
 };
 
 export type ClearResult = {

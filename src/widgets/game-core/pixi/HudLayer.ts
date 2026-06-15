@@ -1,5 +1,14 @@
 import { Container, Graphics, Text, TextStyle } from "pixi.js";
 
+/**
+ * Builds the HUD level label from a levelId. Extracts the first number found
+ * (e.g. "level_1" → "Уровень 1") and falls back to the raw id otherwise.
+ */
+export function formatLevelLabel(levelId: string): string {
+  const match = levelId?.match(/\d+/);
+  return match ? `Уровень ${match[0]}` : levelId || "";
+}
+
 const BAR_X = 16;
 const BAR_Y = 44;
 const BAR_H = 20;
@@ -21,7 +30,7 @@ export class HudLayer extends Container {
   private _score: number = 0;
   /** Smoothly interpolated value shown on screen. */
   private _displayScore: number = 0;
-  private _title: string = "";
+  private _levelLabel: string = "";
   private _width: number = 0;
   /** Remaining pulse time in ms (set when water arrives). */
   private _pulse: number = 0;
@@ -78,10 +87,10 @@ export class HudLayer extends Container {
     this.addChild(this.multiplierBadge);
   }
 
-  update(score: number, targetScore: number, title: string, containerWidth: number, isMultiplierActive = false, multiplierValue = 2) {
+  update(score: number, targetScore: number, levelId: string, containerWidth: number, isMultiplierActive = false, multiplierValue = 2) {
     this._score = score;
     this._targetScore = targetScore;
-    this._title = title;
+    this._levelLabel = formatLevelLabel(levelId);
     this._width = containerWidth;
     this._multiplierActive = isMultiplierActive;
     this._multiplierValue = multiplierValue;
@@ -209,8 +218,8 @@ export class HudLayer extends Container {
     this.scoreText.y = BAR_Y + BAR_H / 2;
     this.scoreText.scale.set(1 + 0.12 * pulseT);
 
-    // Title above bar
-    this.titleText.text = this._title;
+    // Level label above bar
+    this.titleText.text = this._levelLabel;
     this.titleText.style.fontSize = 13;
     this.titleText.anchor.set(0.5, 0);
     this.titleText.x = this._width / 2;

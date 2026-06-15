@@ -25,7 +25,6 @@ function createEmptyInitialBoard(rows: number, cols: number): Array<Array<BoardC
 export const DEFAULT_LEVELS: LevelConfig[] = [
   {
     levelId: "level_1",
-    title: "Обучение: Первые линии",
     grid: { rows: 8, cols: 8 },
     targetScore: 60,
     initialBoard: createEmptyInitialBoard(8, 8),
@@ -48,18 +47,17 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
   },
   {
     levelId: "level_2",
-    title: "Капли дождя",
     grid: { rows: 8, cols: 8 },
     targetScore: 120,
     initialBoard: (() => {
       const board = createEmptyInitialBoard(8, 8);
       // Place some random blocks on the board to start with
-      board[7][0] = { filled: true, color: "#3CD070", hasWater: true };
-      board[7][1] = { filled: true, color: "#3CD070", hasWater: false };
-      board[7][6] = { filled: true, color: "#3C70FF", hasWater: true };
-      board[7][7] = { filled: true, color: "#3C70FF", hasWater: false };
-      board[6][0] = { filled: true, color: "#FF708A", hasWater: false };
-      board[6][7] = { filled: true, color: "#FF708A", hasWater: false };
+      board[7][0] = { filled: true, color: "#3CD070" };
+      board[7][1] = { filled: true, color: "#3CD070" };
+      board[7][6] = { filled: true, color: "#3C70FF" };
+      board[7][7] = { filled: true, color: "#3C70FF" };
+      board[6][0] = { filled: true, color: "#FF708A" };
+      board[6][7] = { filled: true, color: "#FF708A" };
       return board;
     })(),
     figures: {
@@ -81,16 +79,15 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
   },
   {
     levelId: "level_3",
-    title: "Тяжелое испытание",
     grid: { rows: 8, cols: 8 },
     targetScore: 200,
     initialBoard: (() => {
       const board = createEmptyInitialBoard(8, 8);
       // Put a solid block in the center to make it tricky
-      board[3][3] = { filled: true, color: "#B070FF", hasWater: false };
-      board[3][4] = { filled: true, color: "#B070FF", hasWater: true };
-      board[4][3] = { filled: true, color: "#B070FF", hasWater: true };
-      board[4][4] = { filled: true, color: "#B070FF", hasWater: false };
+      board[3][3] = { filled: true, color: "#B070FF" };
+      board[3][4] = { filled: true, color: "#B070FF" };
+      board[4][3] = { filled: true, color: "#B070FF" };
+      board[4][4] = { filled: true, color: "#B070FF" };
       return board;
     })(),
     figures: {

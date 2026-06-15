@@ -15,11 +15,6 @@ export function validateLevelConfig(config: Partial<LevelConfig> | null | undefi
     errors.push("ID уровня (levelId) должен быть непустой строкой.");
   }
 
-  // title
-  if (typeof config.title !== "string" || config.title.trim() === "") {
-    errors.push("Название уровня (title) должно быть непустой строкой.");
-  }
-
   // grid
   if (!config.grid || typeof config.grid !== "object") {
     errors.push("Поле 'grid' должно быть объектом.");

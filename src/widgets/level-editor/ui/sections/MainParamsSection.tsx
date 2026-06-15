@@ -10,7 +10,7 @@ type Props = {
 };
 
 export default function MainParamsSection({ config, onChange }: Props) {
-  const handleTextChange = (field: "levelId" | "title", val: string) => {
+  const handleTextChange = (field: "levelId", val: string) => {
     onChange({ ...config, [field]: val });
   };
 
@@ -46,10 +46,6 @@ export default function MainParamsSection({ config, onChange }: Props) {
         <div className={styles.field}>
           <label>ID уровня</label>
           <input type="text" value={config.levelId || ""} onChange={(e) => handleTextChange("levelId", e.target.value)} />
-        </div>
-        <div className={styles.field}>
-          <label>Название уровня</label>
-          <input type="text" value={config.title || ""} onChange={(e) => handleTextChange("title", e.target.value)} />
         </div>
       </div>
       <div className={styles.row}>

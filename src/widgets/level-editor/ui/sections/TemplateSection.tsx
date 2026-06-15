@@ -19,7 +19,7 @@ export default function TemplateSection({ selectedTemplateId, onSelectedTemplate
           <option value="custom">Пользовательский (без шаблона)</option>
           {DEFAULT_LEVELS.map((level) => (
             <option key={level.levelId} value={level.levelId}>
-              {level.title}
+              {level.levelId}
             </option>
           ))}
         </select>

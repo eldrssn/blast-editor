@@ -2,7 +2,6 @@ import { LevelConfig, BoardCellConfig } from "./types";
 
 export function normalizeLevelConfig(config: Partial<LevelConfig> | null | undefined): LevelConfig {
   const levelId = config?.levelId || "custom_level";
-  const title = config?.title || "Пользовательский уровень";
   const rows = config?.grid?.rows || 8;
   const cols = config?.grid?.cols || 8;
   const targetScore = config?.targetScore || 100;
@@ -17,8 +16,7 @@ export function normalizeLevelConfig(config: Partial<LevelConfig> | null | undef
         if (configRow && configRow[c]) {
           row.push({
             filled: !!configRow[c]?.filled,
-            color: configRow[c]?.color || "#FF708A",
-            hasWater: !!configRow[c]?.hasWater
+            color: configRow[c]?.color || "#FF708A"
           });
         } else {
           row.push(null);
@@ -77,7 +75,6 @@ export function normalizeLevelConfig(config: Partial<LevelConfig> | null | undef
 
   return {
     levelId,
-    title,
     grid: { rows, cols },
     targetScore,
     initialBoard,

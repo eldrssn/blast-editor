@@ -12,6 +12,9 @@ export class BoardLayer extends Container {
   /** Pooled cube graphics for filled cells (share cached contexts). */
   private cubeLayer: Container;
   private cubePool: Graphics[] = [];
+  /** Debug grid overlay (cell boundaries), toggled by visual.showDebugGrid. */
+  private debugGraphics: Graphics;
+  private showDebugGrid: boolean = false;
   private highlightGraphics: Graphics;
   private cellSize: number = 0;
   private boardOffsetX: number = 0;
@@ -32,6 +35,11 @@ export class BoardLayer extends Container {
     // Cubes sit above the empty-cell insets and below the highlight overlay.
     this.cubeLayer = new Container();
     this.addChild(this.cubeLayer);
+
+    // Debug grid sits above the cubes so cell boundaries stay visible.
+    this.debugGraphics = new Graphics();
+    this.debugGraphics.zIndex = 5;
+    this.addChild(this.debugGraphics);
 
     this.highlightGraphics = new Graphics();
     this.highlightGraphics.zIndex = 10;
@@ -103,8 +111,45 @@ export class BoardLayer extends Container {
       this.cubePool[i].visible = false;
     }
 
+    this.renderDebugGrid();
+
     // Clear any leftover highlight
     this.highlightGraphics.clear();
+  }
+
+  /** Toggle the debug grid overlay and redraw it with current geometry. */
+  setShowDebugGrid(value: boolean) {
+    if (this.showDebugGrid === value) return;
+    this.showDebugGrid = value;
+    this.renderDebugGrid();
+  }
+
+  /** Draw cell-boundary lines + an outer frame across the board. */
+  private renderDebugGrid() {
+    this.debugGraphics.clear();
+    if (!this.showDebugGrid || this.cellSize <= 0) return;
+
+    const cellFull = this.cellSize + GAP;
+    const boardW = cellFull * this.cols;
+    const boardH = cellFull * this.rows;
+    const x0 = this.boardOffsetX;
+    const y0 = this.boardOffsetY;
+
+    // Vertical + horizontal cell-boundary lines.
+    for (let c = 0; c <= this.cols; c++) {
+      const x = x0 + c * cellFull;
+      this.debugGraphics.moveTo(x, y0).lineTo(x, y0 + boardH);
+    }
+    for (let r = 0; r <= this.rows; r++) {
+      const y = y0 + r * cellFull;
+      this.debugGraphics.moveTo(x0, y).lineTo(x0 + boardW, y);
+    }
+    this.debugGraphics.stroke({ color: 0xff00ff, alpha: 0.5, width: 1 });
+
+    // Brighter outer frame.
+    this.debugGraphics
+      .rect(x0, y0, boardW, boardH)
+      .stroke({ color: 0xff00ff, alpha: 0.9, width: 2 });
   }
 
   /** Get (or lazily create) a pooled cube graphics by index. */

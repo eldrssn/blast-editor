@@ -111,7 +111,7 @@ export default function GameCore({ config }: GameCoreProps) {
   }, []);
 
   // Structural signature: everything that requires a full rebuild + level
-  // restart. Cosmetic fields (title, visual flags, multiplier value) are
+  // restart. Cosmetic fields (levelId, visual flags, multiplier value) are
   // excluded so changing them applies hot without wiping the in-progress board.
   const structuralKey = useMemo(
     () =>
@@ -167,8 +167,8 @@ export default function GameCore({ config }: GameCoreProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [structuralKey]);
 
-  // Apply cosmetic-only config changes (background, title, target, multiplier
-  // value, effects/sound toggles) hot, without a rebuild or level restart.
+  // Apply cosmetic-only config changes (background, level label, target,
+  // multiplier value, debug grid) hot, without a rebuild or level restart.
   useEffect(() => {
     gameAppRef.current?.applyVisualConfig(config);
   }, [config]);

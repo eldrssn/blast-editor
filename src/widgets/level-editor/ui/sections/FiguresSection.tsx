@@ -2,6 +2,7 @@
 
 import React from "react";
 import { LevelConfig } from "@/entities/game/model/types";
+import FigurePreview from "../FigurePreview";
 import styles from "../../styles/EditorForm.module.scss";
 
 type Props = {
@@ -56,7 +57,10 @@ export default function FiguresSection({ config, onChange }: Props) {
           return (
             <label key={id} className={`${styles.shapeItem} ${isChecked ? styles.shapeItemActive : ""}`}>
               <input type="checkbox" checked={isChecked} onChange={(e) => handleShapeToggle(id, e.target.checked)} />
-              <span>#{id}</span>
+              <span className={styles.shapePreview}>
+                <FigurePreview shapeId={id} color={isChecked ? "#3C70FF" : "#9aa4b2"} />
+              </span>
+              <span className={styles.shapeId}>#{id}</span>
             </label>
           );
         })}
@@ -69,7 +73,10 @@ export default function FiguresSection({ config, onChange }: Props) {
       <div className={styles.weightGrid}>
         {(config.figures?.availableShapeIds || []).map((id) => (
           <div key={id} className={`${styles.field} ${styles.weightField}`}>
-            <label>#{id}</label>
+            <label className={styles.weightLabel}>
+              <FigurePreview shapeId={id} cellSize={9} />
+              <span>#{id}</span>
+            </label>
             <input
               type="number"
               min={0}

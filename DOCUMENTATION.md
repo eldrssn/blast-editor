@@ -82,7 +82,6 @@ src/
 ```ts
 type LevelConfig = {
   levelId: string;
-  title: string;
   grid: { rows: number; cols: number };
   targetScore: number;
   initialBoard: Array<Array<BoardCellConfig | null>>;  // null = пустая клетка
@@ -98,16 +97,16 @@ type LevelConfig = {
   };
   protectionFromLoss: { enabled: boolean; clearBoardCost: number };
   visual: {
-    backgroundId: string;
-    cubeStyle: "pseudo3d";
-    showDebugGrid: boolean;
+    backgroundId: string;   // фон фиксирован (в редакторе не меняется), берётся из дефолтов
+    cubeStyle: "pseudo3d";  // единственный стиль (в редакторе не меняется)
+    showDebugGrid: boolean; // отладочная сетка поверх поля (рабочий тумблер)
   };
 };
 ```
 
 ### Прочие типы
-- `BoardCell` = `{ id; filled; color?; figureId?; hasWater? }` — `id` в формате `"r-c"`.
-- `BoardCellConfig` = `{ filled; color?; hasWater? }` — для `initialBoard`.
+- `BoardCell` = `{ id; filled; color?; figureId? }` — `id` в формате `"r-c"`. Поле «вода» убрано — все кубики считаются «с водой» (капли при очистке летят на каждую клетку).
+- `BoardCellConfig` = `{ filled; color? }` — для `initialBoard`.
 - `FigureShape` = `{ id; cells: {row,col}[] }`; `FigureInstance` = `{ uid; shapeId; cells; color; placed }`.
 - `GameStatus` = `idle | playing | dragging | booster_selecting | protection_from_loss | won | lost`.
 - `GameState` — `config` может быть `null` до `initGame`.
@@ -161,11 +160,11 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 
 - **GameApplication** — владеет `Application`, монтирует canvas, `ResizeObserver` с rAF-коалесингом, letterbox-масштаб сцены (`scale = min(scaleX, scaleY)`), DPR cap = 2, `antialias` всегда включён. Прокси-методы: `collectAll/enterHammerMode/exitHammerMode/setTickerActive/applyVisualConfig/updateState`.
 - **GameScene** — оркестратор. Держит `board/figures/score/isMultiplierActive/multiplierValue`. Здесь вся **placement-логика** (`handlePlacementAttempt` → `handlePlacementSuccess` → `awardAndAnimateClear` → `afterClear`/`resolvePostMove`) и **исполнение бустеров** (`collectAll`, `applyHammerAt`). Единый `Ticker` гоняет левитацию + анимацию HUD + рамку молотка; `setTickerActive(false)` останавливает его на оверлеях.
-  - `applyVisualConfig(config)` — горячее применение **косметики** (фон, title, targetScore, multiplierValue) без перестройки сцены.
-- **BoardLayer** — сетка, пул кубов (`acquireCube`), `showHighlight` (зелёный/красный placement), `showHammerArea`+`tickHammer` (пульсация рамки), `getGridInfo()` (cellSize/offset — единый источник координат).
+  - `applyVisualConfig(config)` — горячее применение **косметики** (фон, лейбл уровня, targetScore, multiplierValue, `showDebugGrid`) без перестройки сцены.
+- **BoardLayer** — сетка, пул кубов (`acquireCube`), `showHighlight` (зелёный/красный placement), `showHammerArea`+`tickHammer` (пульсация рамки), `getGridInfo()` (cellSize/offset — единый источник координат), `setShowDebugGrid(bool)`/`renderDebugGrid` (отладочная сетка границ клеток поверх поля).
 - **FigureLayer** — слоты внизу, `updateLevitation`, drag-and-drop (`onFigurePointerDown/onPointerMove/onPointerUp`), `getGridPositionFromPointer`, `playBounceAnimation`, `animateReturnToSlot`. Колбэки в сцену: `getGridInfo/canPlaceAt/onHighlightUpdate/onPlacementAttempt/onPlacementSuccess`. `FigureLayer.slotHeight` — статик.
 - **EffectsLayer** — `playLineClear` (pop-кубы + капли воды `spawnDroplet`/`spawnSplash` летят в HUD + combo-лейбл `showCombo` при ≥2 линий). Свой tween-loop, пул графики. Эффекты всегда включены (тумблера нет).
-- **HudLayer** — прогресс-бар воды + счёт `0/target`, `tick` (плавный счётчик), `pulse`, `snapScore`, `getWaterTargetPoint()` (цель для капель), x2-индикатор при активном множителе.
+- **HudLayer** — прогресс-бар воды + счёт `0/target`, лейбл уровня (`formatLevelLabel(levelId)` → «Уровень N», число берётся из `levelId`), `tick` (плавный счётчик), `pulse`, `snapScore`, `getWaterTargetPoint()` (цель для капель), x2-индикатор при активном множителе.
 - **HammerController** — только ввод режима молотка: `enter/cancel`, отслеживание области под указателем, размер из `config.boosters.hammer.areaRows/Cols`, `onConfirm(area)` → `GameScene.applyHammerAt`.
 - **cube.ts / cubeContext.ts** — `drawPseudo3DCube` (основной цвет, тёмная нижняя грань, highlight, тень, скругление `CORNER_RADIUS=5`, `DEPTH=5`); `getCubeContext` кэширует `GraphicsContext` по `цвет+размер`.
 
@@ -182,12 +181,13 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 - **useLevelEditor.ts** — вся логика. Разделяет **`editConfig`** (то, что редактируется) и **`appliedConfig`** (то, что играется в preview). Превью обновляется только после **«Применить»**. `validationErrors` выводятся через `useMemo` из `editConfig`. JSON-зеркало (`jsonText`) синхронизируется; ручной ввод JSON парсится «на лету» (сохраняет сырой текст, при ошибке — `jsonError`). Toast вместо `alert`.
   - Хэндлеры: `handleTemplateChange` (выбор из `DEFAULT_LEVELS` или `"custom"`), `handleConfigChange`, `handleApply`, `handleReset`, `handleCopyJson` (clipboard), `handleImportJson`, `handleJsonChange`.
 - **EditorForm.tsx** — композиция 8 секций (`sections/`):
-  `TemplateSection` (выбор шаблона) · `MainParamsSection` (levelId/title/targetScore/grid) · `InitialBoardSection` (интерактивная сетка: клик включает/выключает блок + цвет) · `FiguresSection` (availableShapeIds + spawnWeights) · `BoostersSection` (enabled/count/multiplierValue/hammer area) · `ProtectionSection` (enabled + clearBoardCost) · `VisualSection` (backgroundId, cubeStyle, showDebugGrid) · `JsonSection` (textarea + ошибки + Импорт).
+  `TemplateSection` (выбор шаблона по `levelId`) · `MainParamsSection` (levelId/targetScore/grid — без названия уровня) · `InitialBoardSection` (интерактивная сетка: клик включает/выключает блок + цвет; кисти воды нет — все блоки «с водой») · `FiguresSection` (availableShapeIds + spawnWeights, каждая фигура показана мини-превью через [FigurePreview.tsx](src/widgets/level-editor/ui/FigurePreview.tsx)) · `BoostersSection` (enabled/count/multiplierValue/hammer area) · `ProtectionSection` (enabled + clearBoardCost) · `VisualSection` (только `showDebugGrid`; фон и стиль кубиков всегда фиксированы) · `JsonSection` (textarea + ошибки + Импорт).
+- **[FigurePreview.tsx](src/widgets/level-editor/ui/FigurePreview.tsx)** — чистый React/CSS-grid компонент: по `shapeId` берёт геометрию из `FIGURE_SHAPES` и рисует мини-фигуру (без Pixi). Используется в `FiguresSection` в списке выбора и рядом с весами.
 
 ### GameCore ↔ редактор: ключевая оптимизация
 [GameCore.tsx](src/widgets/game-core/ui/GameCore.tsx) различает **структурные** и **косметические** изменения конфига:
 - **`structuralKey`** (`useMemo`) = grid, targetScore, initialBoard, figures, protectionFromLoss, booster counts/enabled → при изменении **полная перестройка Pixi + рестарт уровня**.
-- **косметика** (title, visual-флаги, multiplierValue) → `applyVisualConfig` **горячо**, без сброса прогресса.
+- **косметика** (levelId/лейбл уровня, `visual.showDebugGrid`, multiplierValue) → `applyVisualConfig` **горячо**, без сброса прогресса.
 
 Оверлеи в GameCore: **победа** (status `won`), **поражение** (`lost`), **защита от поражения** (`protection_from_loss` — «Короб заполнен»/«Нет доступных ходов», кнопка очистки с учётом `clearBoardCost` и проверкой `canAffordClear`).
 
@@ -196,10 +196,10 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 ## 8. Конфиги и контент
 
 - **[figureShapes.ts](src/entities/game/config/figureShapes.ts)** — `FIGURE_SHAPES` (15 фигур, id `"1"`…`"15"`) + `DEFAULT_FIGURE_WEIGHTS` (веса спавна; `"1"`=16 … `"15"`=1).
-- **[defaultLevels.ts](src/entities/game/config/defaultLevels.ts)** — 3 уровня:
-  - `level_1` «Обучение» — target 60, простые фигуры, фон `wood_classic`.
-  - `level_2` «Капли дождя» — target 120, pre-filled клетки по краям, фон `wood_dark`.
-  - `level_3` «Тяжёлое испытание» — target 200, блок 2×2 в центре, все 15 фигур, фон `wood_royal`.
+- **[defaultLevels.ts](src/entities/game/config/defaultLevels.ts)** — 3 уровня (без поля `title`):
+  - `level_1` — target 60, простые фигуры, фон `wood_classic`.
+  - `level_2` — target 120, pre-filled клетки по краям, фон `wood_dark`.
+  - `level_3` — target 200, блок 2×2 в центре, все 15 фигур, фон `wood_royal`.
   - `defaultColors`: Rose `#FF708A`, Emerald `#3CD070`, Cobalt `#3C70FF`, Amber `#F59E0B`, Purple `#B070FF`.
 
 ---
@@ -232,6 +232,9 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 | Drag-and-drop | `pixi/FigureLayer.ts` |
 | Молоток (выбор области) | `pixi/HammerController.ts` + `BoardLayer.showHammerArea` |
 | Поля формы редактора | `widgets/level-editor/ui/sections/*` |
+| Мини-превью фигур в редакторе | `widgets/level-editor/ui/FigurePreview.tsx` |
+| Лейбл уровня в игре («Уровень N») | `pixi/HudLayer.ts` (`formatLevelLabel`) |
+| Отладочная сетка поля | `pixi/BoardLayer.ts` (`setShowDebugGrid`) + `GameScene.renderState` |
 | Валидация конфига | `entities/game/model/validation.ts` |
 | Дефолты конфига | `entities/game/model/normalize.ts` |
 | Структурный vs косметический ребилд | `GameCore.tsx` (`structuralKey`) + `GameScene.applyVisualConfig` |
@@ -240,7 +243,12 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 
 ## 11. Соответствие ТЗ
 
-**Известных расхождений нет.** 2026-06-15 ТЗ ([block_blast_core_game_prompts.md](block_blast_core_game_prompts.md) и ТЗ-секция [AGENTS.md](AGENTS.md)) приведены в соответствие с кодом, а код — к желаемому поведению. Этот документ — единая правда.
+**Расхождения с исходным ТЗ (намеренные, код — единая правда).** 2026-06-15 ТЗ ([block_blast_core_game_prompts.md](block_blast_core_game_prompts.md) и ТЗ-секция [AGENTS.md](AGENTS.md)) были приведены в соответствие с кодом. Затем по правкам заказчика добавлены отклонения:
+
+1. **Поле `title` удалено** из `LevelConfig`. Редактор оперирует только `levelId`; в игре HUD показывает «Уровень N», где N извлекается из `levelId` (`formatLevelLabel`).
+2. **Поле `hasWater` удалено** из `BoardCell`/`BoardCellConfig`/`ClearedCellCoord`. Все кубики считаются «с водой»: капли/очки при очистке формируются для каждой клетки независимо от флага. Кисть «Блок с водой» из редактора убрана.
+3. **Редактор визуала урезан:** выбор `backgroundId` и `cubeStyle` убран из UI (значения фиксированы, остаются дефолтами в `normalize`). Тумблер `showDebugGrid` теперь **реально работает** — рисует отладочную сетку в `BoardLayer`.
+4. **Фигуры в редакторе** показываются мини-превью (`FigurePreview`) вместо «#id».
 
 Что было унифицировано в ту сессию (для истории):
 1. Next.js зафиксирован как **16** (был «15+» в ТЗ).

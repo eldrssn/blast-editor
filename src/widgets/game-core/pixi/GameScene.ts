@@ -158,9 +158,10 @@ export class GameScene extends Container {
     }
 
     // HUD
-    this.hudLayer.update(score, this.config.targetScore, this.config.title, SCENE_W, this.isMultiplierActive, this.multiplierValue);
+    this.hudLayer.update(score, this.config.targetScore, this.config.levelId, SCENE_W, this.isMultiplierActive, this.multiplierValue);
 
     // Board
+    this.boardLayer.setShowDebugGrid(this.config.visual?.showDebugGrid === true);
     this.boardLayer.draw(board, SCENE_W, SCENE_H, HUD_HEIGHT, FigureLayer.slotHeight + 8);
 
     // Figures
@@ -256,7 +257,7 @@ export class GameScene extends Container {
         // Award the score the instant the first water droplet lands.
         onScoreArrive: () => {
           this.score += points;
-          this.hudLayer.update(this.score, this.config.targetScore, this.config.title, SCENE_W, this.isMultiplierActive, this.multiplierValue);
+          this.hudLayer.update(this.score, this.config.targetScore, this.config.levelId, SCENE_W, this.isMultiplierActive, this.multiplierValue);
           this.hudLayer.pulse();
           this.callbacks?.onScoreUpdate(this.score);
         },

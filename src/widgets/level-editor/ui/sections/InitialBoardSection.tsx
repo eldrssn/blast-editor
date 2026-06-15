@@ -15,7 +15,6 @@ export default function InitialBoardSection({ config, onChange }: Props) {
   const boardColors = config.figures?.colors?.length ? config.figures.colors : FALLBACK_COLORS;
 
   const [brushColorRaw, setBrushColor] = React.useState<string>(boardColors[0]);
-  const [brushWater, setBrushWater] = React.useState<boolean>(false);
 
   // Keep the brush valid if the level's colour palette no longer contains it,
   // without an effect — derive the effective colour each render instead.
@@ -45,14 +44,14 @@ export default function InitialBoardSection({ config, onChange }: Props) {
     const board = buildBoardSnapshot();
     const existing = board[r][c];
     if (existing && existing.filled) {
-      if (existing.color !== brushColor || !!existing.hasWater !== brushWater) {
+      if (existing.color !== brushColor) {
         // Re-paint with the current brush instead of clearing.
-        board[r][c] = { filled: true, color: brushColor, hasWater: brushWater };
+        board[r][c] = { filled: true, color: brushColor };
       } else {
         board[r][c] = null;
       }
     } else {
-      board[r][c] = { filled: true, color: brushColor, hasWater: brushWater };
+      board[r][c] = { filled: true, color: brushColor };
     }
     onChange({ ...config, initialBoard: board });
   };
@@ -64,7 +63,7 @@ export default function InitialBoardSection({ config, onChange }: Props) {
 
   const handleFillBoard = () => {
     const board = buildBoardSnapshot().map((row) =>
-      row.map<BoardCellConfig | null>(() => ({ filled: true, color: brushColor, hasWater: brushWater }))
+      row.map<BoardCellConfig | null>(() => ({ filled: true, color: brushColor }))
     );
     onChange({ ...config, initialBoard: board });
   };
@@ -92,11 +91,6 @@ export default function InitialBoardSection({ config, onChange }: Props) {
         ))}
       </div>
 
-      <div className={`${styles.field} ${styles.checkboxField}`} style={{ marginBottom: "0.75rem" }}>
-        <input type="checkbox" id="brush-water" checked={brushWater} onChange={(e) => setBrushWater(e.target.checked)} />
-        <label htmlFor="brush-water">Блок с водой (hasWater) 💧</label>
-      </div>
-
       {/* Interactive grid */}
       {boardRows > 0 && boardCols > 0 ? (
         <div className={styles.boardGrid} style={{ "--board-cols": boardCols } as React.CSSProperties}>
@@ -112,9 +106,7 @@ export default function InitialBoardSection({ config, onChange }: Props) {
                   title={`[${r}, ${c}]`}
                   className={`${styles.boardCell} ${filled ? styles.boardCellFilled : ""}`}
                   style={filled ? { background: cell?.color || "#FF708A" } : undefined}
-                >
-                  {filled && cell?.hasWater ? "💧" : ""}
-                </button>
+                />
               );
             })
           )}

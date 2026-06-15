@@ -104,7 +104,6 @@ src/
     filled: boolean;
     color?: string;
     figureId?: string;
-    hasWater?: boolean;
   };
   ```
 
