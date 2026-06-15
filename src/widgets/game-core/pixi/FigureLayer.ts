@@ -6,6 +6,9 @@ import { soundManager } from "@/shared/lib/sound";
 const SLOT_COUNT = 3;
 const FIGURE_SCALE_IN_SLOT = 0.55;
 const SLOT_HEIGHT = 120;
+/** Space reserved at the very bottom of the scene for the HTML booster bar,
+ * so the order top→bottom reads HUD → board → figures → boosters. */
+const BOOSTER_BAND = 70;
 const LEVITATION_AMPLITUDE = 3;
 const LEVITATION_SPEED = 0.002;
 
@@ -51,6 +54,14 @@ export class FigureLayer extends Container {
   /** Levitation animation */
   private levitationPhases: number[] = [];
   private animationFrame: number = 0;
+
+  /**
+   * Per-slot identity of the figure currently drawn in that slot (`uid` or null
+   * for an empty/dragged slot). `draw` rebuilds a slot's graphics only when this
+   * changes, so unrelated state updates (board/score) don't recreate untouched
+   * figures and restart their levitation — fixes the "jump" on placement.
+   */
+  private renderedKeys: (string | null)[] = [];
 
   /** Active rAF ids for bounce/return animations, cancelled on destroy. */
   private rafIds = new Set<number>();
@@ -108,7 +119,7 @@ export class FigureLayer extends Container {
     const cellSize = Math.max(boardCellSize * FIGURE_SCALE_IN_SLOT, 10);
     const gap = 2;
     const slotW = sceneW / SLOT_COUNT;
-    const slotY = sceneH - SLOT_HEIGHT;
+    const slotY = sceneH - SLOT_HEIGHT - BOOSTER_BAND;
 
     for (let i = 0; i < SLOT_COUNT; i++) {
       const slot = this.slotContainers[i];
@@ -130,15 +141,20 @@ export class FigureLayer extends Container {
         width: 1,
       });
 
+      const figure = figures[i];
+      const isDragging = this.dragState?.figureIndex === i;
+      const shouldShow = !!figure && !figure.placed && !isDragging;
+      const key = shouldShow ? figure!.uid : null;
+
+      // Slot already shows the right figure — keep its graphics (and its ongoing
+      // levitation) intact so unrelated re-renders don't restart the animation.
+      if (key === this.renderedKeys[i]) continue;
+
       // Remove old figure graphics (children after bg) and free their GPU
       // resources — removeChild alone leaves geometry around until GC.
       this.clearSlotFigure(slot);
-
-      const figure = figures[i];
-      if (!figure || figure.placed) continue;
-
-      // Don't draw in slot if it's being dragged
-      if (this.dragState && this.dragState.figureIndex === i) continue;
+      this.renderedKeys[i] = key;
+      if (!shouldShow || !figure) continue;
 
       // Compute figure bounding box
       const minRow = Math.min(...figure.cells.map((c) => c.row));
@@ -385,8 +401,10 @@ export class FigureLayer extends Container {
   }
 
   private redrawSlotWithoutFigure(figureIndex: number) {
-    // Remove figure graphics but keep bg (child 0).
+    // Remove figure graphics but keep bg (child 0). Clear the cached key so the
+    // next draw() re-creates the figure when it returns to the slot.
     this.clearSlotFigure(this.slotContainers[figureIndex]);
+    this.renderedKeys[figureIndex] = null;
   }
 
   /** Remove + destroy every child of a slot except its background (index 0). */
@@ -450,7 +468,7 @@ export class FigureLayer extends Container {
     onComplete: () => void
   ) {
     const slotW = this.sceneWidth / SLOT_COUNT;
-    const slotY = this.sceneHeight - SLOT_HEIGHT;
+    const slotY = this.sceneHeight - SLOT_HEIGHT - BOOSTER_BAND;
     const targetX = slotIndex * slotW + slotW / 2 - 20;
     const targetY = slotY + SLOT_HEIGHT / 2 - 20;
 
@@ -486,6 +504,11 @@ export class FigureLayer extends Container {
   /** Returns bottom slot height so GameScene can account for it */
   static get slotHeight() {
     return SLOT_HEIGHT;
+  }
+
+  /** Reserved booster-bar band below the figure slots (for board layout). */
+  static get boosterBand() {
+    return BOOSTER_BAND;
   }
 
   /** Cancel any in-flight bounce/return animations and free resources. */

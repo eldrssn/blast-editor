@@ -49,7 +49,9 @@
 
 .boosterBar {
   position: absolute;
-  top: 9%;
+  // Pinned to the bottom band reserved in the Pixi scene, below the figure
+  // slots — vertical order reads HUD → board → figures → boosters.
+  bottom: 2%;
   left: 50%;
   transform: translateX(-50%);
   z-index: 15;
@@ -125,7 +127,7 @@
 
 .hammerHint {
   position: absolute;
-  bottom: 17%;
+  bottom: 24%;
   left: 50%;
   transform: translateX(-50%);
   z-index: 16;

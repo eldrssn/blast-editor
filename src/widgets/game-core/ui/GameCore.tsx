@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useEffect, useRef, useCallback, useMemo, useState } from "react";
 import { LevelConfig } from "@/entities/game/model/types";
 import { useGameStore } from "../model/gameStore";
 import { GameApplication } from "../pixi/GameApplication";
@@ -29,6 +29,11 @@ export default function GameCore({ config }: GameCoreProps) {
   // Store setters (stable references via zustand)
   const setStatus = useGameStore((s) => s.setStatus);
   const clearBoardAndContinue = useGameStore((s) => s.clearBoardAndContinue);
+
+  // Booster awaiting confirmation. The instant-effect boosters ("Собрать всё" и
+  // "Множитель") открывают окно с описанием и кнопками Применить/Отмена — как
+  // молоток даёт шанс понять и отменить действие. Молоток подтверждает себя сам.
+  const [pendingBooster, setPendingBooster] = useState<"collectAll" | "multiplier" | null>(null);
 
   // "Короб заполнен" when every cell is occupied, otherwise just no valid moves.
   const isBoardFull =
@@ -109,6 +114,13 @@ export default function GameCore({ config }: GameCoreProps) {
     store.setActiveBooster(null);
     store.setStatus("playing");
   }, []);
+
+  // Apply the booster awaiting confirmation, then close the dialog.
+  const confirmPendingBooster = useCallback(() => {
+    if (pendingBooster === "collectAll") handleCollectAll();
+    else if (pendingBooster === "multiplier") handleMultiplier();
+    setPendingBooster(null);
+  }, [pendingBooster, handleCollectAll, handleMultiplier]);
 
   // Structural signature: everything that requires a full rebuild + level
   // restart. Cosmetic fields (levelId, visual flags, multiplier value) are
@@ -206,7 +218,7 @@ export default function GameCore({ config }: GameCoreProps) {
               label="Собрать всё"
               count={boosterInventory.collectAll}
               disabled={!isPlaying || boosterInventory.collectAll <= 0 || !hasFilledCells}
-              onClick={handleCollectAll}
+              onClick={() => setPendingBooster("collectAll")}
             />
           )}
           {config.boosters?.multiplier?.enabled && (
@@ -218,7 +230,7 @@ export default function GameCore({ config }: GameCoreProps) {
               disabled={
                 !isPlaying || boosterInventory.multiplier <= 0 || isMultiplierActive
               }
-              onClick={handleMultiplier}
+              onClick={() => setPendingBooster("multiplier")}
             />
           )}
           {config.boosters?.hammer?.enabled && (
@@ -245,6 +257,35 @@ export default function GameCore({ config }: GameCoreProps) {
           <button className={styles.hammerCancel} onClick={handleCancelHammer}>
             Отмена
           </button>
+        </div>
+      )}
+
+      {/* Booster confirmation dialog (collectAll / multiplier) */}
+      {pendingBooster && (
+        <div className={styles.overlay}>
+          <div className={styles.overlayCard}>
+            <h2 className={styles.overlayTitle}>
+              {pendingBooster === "collectAll" ? "🧹 Собрать всё" : "✖️ Множитель"}
+            </h2>
+            <p className={styles.overlayText}>
+              {pendingBooster === "collectAll"
+                ? "Очистит все блоки на поле и начислит за них очки. Применить бустер?"
+                : `Удвоит начисляемые очки (×${Number(
+                    (config.boosters?.multiplier?.multiplierValue ?? 2).toFixed(2)
+                  )}) до конца уровня. Применить бустер?`}
+            </p>
+            <div className={styles.overlayButtons}>
+              <button className={styles.overlayButton} onClick={confirmPendingBooster}>
+                Применить
+              </button>
+              <button
+                className={`${styles.overlayButton} ${styles.overlayButtonSecondary}`}
+                onClick={() => setPendingBooster(null)}
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

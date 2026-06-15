@@ -160,9 +160,10 @@ export class GameScene extends Container {
     // HUD
     this.hudLayer.update(score, this.config.targetScore, this.config.levelId, SCENE_W, this.isMultiplierActive, this.multiplierValue);
 
-    // Board
+    // Board — reserve room below for the figure slots *and* the booster band so
+    // the vertical order reads HUD → board → figures → boosters.
     this.boardLayer.setShowDebugGrid(this.config.visual?.showDebugGrid === true);
-    this.boardLayer.draw(board, SCENE_W, SCENE_H, HUD_HEIGHT, FigureLayer.slotHeight + 8);
+    this.boardLayer.draw(board, SCENE_W, SCENE_H, HUD_HEIGHT, FigureLayer.slotHeight + FigureLayer.boosterBand + 8);
 
     // Figures
     const { cellSize } = this.boardLayer.getGridInfo();
@@ -254,9 +255,10 @@ export class GameScene extends Container {
       comboCount,
       target,
       {
-        // Award the score the instant the first water droplet lands.
+        // Award the score the instant the first water droplet lands. Clamp to the
+        // target so the counter can never read above the goal (e.g. never "100/60").
         onScoreArrive: () => {
-          this.score += points;
+          this.score = Math.min(this.score + points, this.config.targetScore);
           this.hudLayer.update(this.score, this.config.targetScore, this.config.levelId, SCENE_W, this.isMultiplierActive, this.multiplierValue);
           this.hudLayer.pulse();
           this.callbacks?.onScoreUpdate(this.score);
