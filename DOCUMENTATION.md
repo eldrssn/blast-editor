@@ -92,6 +92,7 @@ type LevelConfig = {
     availableShapeIds: string[];
     spawnWeights: Record<string, number>;
     colors: string[];
+    scriptedOpening?: ScriptedFigure[];  // опц. скрипт старта: до 9 фигур (3 набора по 3); пусто/нет → весь спавн случайный
   };
   boosters: {
     collectAll: { enabled: boolean; initialCount: number };
@@ -110,9 +111,10 @@ type LevelConfig = {
 ### Прочие типы
 - `BoardCell` = `{ id; filled; color?; figureId? }` — `id` в формате `"r-c"`. Поле «вода» убрано — все кубики считаются «с водой» (капли при очистке летят на каждую клетку).
 - `BoardCellConfig` = `{ filled; color? }` — для `initialBoard`.
+- `ScriptedFigure` = `{ shapeId? }` — один слот стартового скрипта. Нет `shapeId` (или индекс вышел за длину) → слот случайный. Цвет в скрипте не хранится (всегда случайный).
 - `FigureShape` = `{ id; cells: {row,col}[] }`; `FigureInstance` = `{ uid; shapeId; cells; color; placed }`.
 - `GameStatus` = `idle | playing | dragging | booster_selecting | protection_from_loss | won | lost`.
-- `GameState` — `config` может быть `null` до `initGame`.
+- `GameState` — `config` может быть `null` до `initGame`. Поле `scriptedSetIndex: number` — сколько стартовых наборов уже взято из `figures.scriptedOpening` (0 на старте, → 1 после первого набора).
 - `CompletedLine` = `{ type: "row"|"col"; index }`; `ClearedCellCoord`, `ClearResult`, `CalculateScoreParams`, `HammerArea` (bounding box `startRow/startCol/endRow/endCol`).
 - `BoosterType` = `"collectAll" | "multiplier" | "hammer"`.
 
@@ -130,13 +132,13 @@ type LevelConfig = {
 | `findCompletedLines(board)` | board.ts | Полные строки и столбцы. |
 | `clearCompletedLines(board, lines)` | board.ts | Очистка через `Set` уникальных клеток → `ClearResult` (`clearedCellsCount` уникален на пересечениях). |
 | `canPlaceAnyFigure(board, figures)` | board.ts | Можно ли поставить хоть одну неразмещённую. Если все размещены → `true`. |
-| `generateFigureSet(config, board?)` | figures.ts | Взвешенный спавн 3 фигур. С `board` — до `PLACEABLE_RETRIES=12` попыток, чтобы набор был размещаем. |
+| `generateFigureSet(config, board?, scriptedSetIndex?)` | figures.ts | Взвешенный спавн 3 фигур. С `board` — до `PLACEABLE_RETRIES=12` попыток, чтобы набор был размещаем. `scriptedSetIndex` пинит слоты из среза `config.figures.scriptedOpening[idx*3 .. +2]` (заданный `shapeId` фиксируется, остальные слоты — рандом; ретрай пере-роллит только не-пиннутые; полностью пиннутый набор ретрай пропускает). |
 | `calculateScore({clearedCellsCount, clearedLinesCount, isMultiplierActive, multiplierValue?})` | scoring.ts | `lines>0`: `cells*lines*mult`; иначе (бустеры): `cells*mult`. `mult = isActive ? multiplierValue(деф.2) : 1`. |
 | `checkWinCondition(score, targetScore)` | scoring.ts | `score >= targetScore`. |
 | `checkLoseCondition(board, figures)` | scoring.ts | `!canPlaceAnyFigure`. |
 | `applyCollectAll(board)` | boosters.ts | Чистит все заполненные клетки. |
 | `applyHammer(board, area)` | boosters.ts | Чистит заполненные внутри bounding box. |
-| `resolvePostMove(board, figures, score, config)` | gameFlow.ts | Порядок: **1)** win → **2)** regenerate (если все placed) → **3)** `protection`/`lost` если некуда ставить → **4)** `playing`. Возвращает `{outcome, figures, regenerated}`. |
+| `resolvePostMove(board, figures, score, config, scriptedSetIndex?)` | gameFlow.ts | Порядок: **1)** win → **2)** regenerate (если все placed) → **3)** `protection`/`lost` если некуда ставить → **4)** `playing`. При регенерации передаёт `scriptedSetIndex` в `generateFigureSet`. Возвращает `{outcome, figures, regenerated, nextScriptedSetIndex}` (индекс +1 при регенерации). |
 
 **Очки начисляются только** за очистку линий и бустеры (никогда за простую установку). Вода = очки.
 
@@ -148,7 +150,7 @@ type LevelConfig = {
 
 Zustand. `GameStoreState = GameState & экшены`.
 
-Экшены: `initGame(config)` (создаёт борд+набор, сбрасывает счёт/множитель/инвентарь), `setStatus/setBoard/setCurrentFigures/setScore/setActiveBooster`, `useBooster(type)` (списывает заряд если >0), `activateMultiplier()` (идемпотентен: no-op если не playing / уже активен / нет зарядов), `clearBoardAndContinue()` (защита от поражения: полностью чистит борд, при необходимости генерит новый набор; **тест-сборка: очистка бесплатна — очки не списываются и не начисляются**). Сама анимация исчезновения кубиков проигрывается отдельно — см. `GameScene.playBoardClear` (§6), стор только опустошает борд по завершении.
+Экшены: `initGame(config)` (создаёт борд+набор с `scriptedSetIndex=0`, выставляет `scriptedSetIndex=1`, сбрасывает счёт/множитель/инвентарь), `setStatus/setBoard/setCurrentFigures/setScore/setActiveBooster`, `setScriptedSetIndex(i)` (синхронизация курсора скрипта из Pixi-сцены обратно в стор), `useBooster(type)` (списывает заряд если >0), `activateMultiplier()` (идемпотентен: no-op если не playing / уже активен / нет зарядов), `clearBoardAndContinue()` (защита от поражения: полностью чистит борд, при необходимости генерит новый набор — тогда и `scriptedSetIndex` +1; **тест-сборка: очистка бесплатна — очки не списываются и не начисляются**). Сама анимация исчезновения кубиков проигрывается отдельно — см. `GameScene.playBoardClear` (§6), стор только опустошает борд по завершении.
 
 ---
 
@@ -162,11 +164,11 @@ Zustand. `GameStoreState = GameState & экшены`.
 ```
 React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene ──▶ слои
         ▲                                                  │
-        └────────── GameSceneCallbacks (board/figures/score/status/hammer) ──┘
+        └──── GameSceneCallbacks (board/figures/score/status/hammer/scriptedSetIndex) ──┘
 ```
 
-- **GameApplication** — владеет `Application`, монтирует canvas, `ResizeObserver` с rAF-коалесингом, letterbox-масштаб сцены (`scale = min(scaleX, scaleY)`), DPR cap = 2, `antialias` всегда включён. Прокси-методы: `collectAll/enterHammerMode/confirmHammerMode/exitHammerMode/setTickerActive/applyVisualConfig/updateState`.
-- **GameScene** — оркестратор. Держит `board/figures/score/isMultiplierActive/multiplierValue`. Здесь вся **placement-логика** (`handlePlacementAttempt` → `handlePlacementSuccess` → `awardAndAnimateClear` → `afterClear`/`resolvePostMove`) и **исполнение бустеров** (`collectAll`, `applyHammerAt`). `playBoardClear(onComplete)` — анимированная защитная очистка: собирает `filled`-клетки, опустошает борд визуально и проигрывает `EffectsLayer.playCellsVanish` (поп-кубы **без** воды/очков); фактический wipe+регенерацию делает стор в `onComplete` (проброшен из [GameApplication](src/widgets/game-core/pixi/GameApplication.ts) → [GameCore](src/widgets/game-core/ui/GameCore.tsx)). Единый `Ticker` гоняет левитацию + анимацию HUD + рамку молотка; `setTickerActive(false)` останавливает его на оверлеях.
+- **GameApplication** — владеет `Application`, монтирует canvas, `ResizeObserver` с rAF-коалесингом, letterbox-масштаб сцены (`scale = min(scaleX, scaleY)`), DPR cap = 2, `antialias` всегда включён. Прокси-методы: `collectAll/enterHammerMode/confirmHammerMode/exitHammerMode/setTickerActive/applyVisualConfig/updateState/setScriptedSetIndex`. `updateState(board, figures, score, isMultiplierActive?)` рисует борд/фигуры/HUD; курсор скрипта зеркалится **отдельным** лёгким `setScriptedSetIndex(i)` → `GameScene.setScriptedSetIndex` (намеренно не в `updateState`, чтобы синк только курсора — эхо после регенерации в сцене — не вызывал лишний `renderState`).
+- **GameScene** — оркестратор. Держит `board/figures/score/isMultiplierActive/multiplierValue`. Держит также `scriptedSetIndex` — зеркало курсора скрипта; **единый источник правды — стор**, сцена в `afterClear` при регенерации считает `nextScriptedSetIndex` и шлёт его в стор через `onScriptedSetIndexUpdate`, а GameCore синкает значение обратно в зеркало (эхо безопасно: это только присвоение числа, без рендера). Здесь вся **placement-логика** (`handlePlacementAttempt` → `handlePlacementSuccess` → `awardAndAnimateClear` → `afterClear`/`resolvePostMove`) и **исполнение бустеров** (`collectAll`, `applyHammerAt`). `playBoardClear(onComplete)` — анимированная защитная очистка: собирает `filled`-клетки, опустошает борд визуально и проигрывает `EffectsLayer.playCellsVanish` (поп-кубы **без** воды/очков); фактический wipe+регенерацию делает стор в `onComplete` (проброшен из [GameApplication](src/widgets/game-core/pixi/GameApplication.ts) → [GameCore](src/widgets/game-core/ui/GameCore.tsx)). Единый `Ticker` гоняет левитацию + анимацию HUD + рамку молотка; `setTickerActive(false)` останавливает его на оверлеях.
   - `applyVisualConfig(config)` — горячее применение **косметики** (фон, лейбл уровня, targetScore, multiplierValue, `showDebugGrid`) без перестройки сцены.
 - **BoardLayer** — сетка, пул кубов (`acquireCube`), `showHighlight` (зелёный/красный placement), `showHammerArea`+`tickHammer` (пульсация рамки), `getGridInfo()` (cellSize/offset — единый источник координат), `setShowDebugGrid(bool)`/`renderDebugGrid` (отладочная сетка границ клеток поверх поля).
 - **FigureLayer** — слоты внизу, `updateLevitation`, drag-and-drop (`onFigurePointerDown/onPointerMove/onPointerUp`), `getGridPositionFromPointer`, `playBounceAnimation`, `animateReturnToSlot`. Колбэки в сцену: `getGridInfo/canPlaceAt/onHighlightUpdate/onPlacementAttempt/onPlacementSuccess`. `FigureLayer.slotHeight` / `FigureLayer.boosterBand` — статик. **Идемпотентный `draw`:** через `renderedKeys[slot]` (uid фигуры) графика слота пересоздаётся только при смене фигуры — посторонние ре-рендеры (board/score за одну установку) больше не пересоздают неизменные фигуры и не сбрасывают их левитацию (был «прыжок» при установке). Перетаскивание сбрасывает ключ слота (`redrawSlotWithoutFigure`). **Спавн-анимация:** новые фигуры (новые `uid` — initGame/регенерация) появляются «попом» (scale 0→1 `easeOutBack` + fade) со stagger'ом `SPAWN_STAGGER_MS` между слотами; `seenUids` гарантирует, что возврат той же фигуры в слот после неудачного дропа не анимируется повторно (`playSpawnAnimation`).
@@ -191,7 +193,7 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 - **useLevelEditor.ts** — общая логика и для `/editor`, и для `/`. Разделяет **`editConfig`** (то, что редактируется) и **`appliedConfig`** (то, что играется в preview/на главной). Игра обновляется только после **«Применить»**; выбор шаблона и импорт JSON меняют только draft редактора. `validationErrors` выводятся через `useMemo` из `editConfig`. JSON-зеркало (`jsonText`) синхронизируется; ручной ввод JSON парсится «на лету» (сохраняет сырой текст, при ошибке — `jsonError`). Toast вместо `alert`.
   - Хэндлеры: `handleTemplateChange` (выбор из `DEFAULT_LEVELS` или `"custom"`), `handleConfigChange`, `handleApply` (возвращает `boolean` успеха), `handleReset`, `handleCopyJson` (clipboard), `handleImportJson`, `handleJsonChange`.
 - **EditorForm.tsx** — композиция 8 секций (`sections/`):
-  `TemplateSection` (выбор шаблона по `levelId`) · `MainParamsSection` (levelId/targetScore/grid — без названия уровня) · `InitialBoardSection` (интерактивная сетка: клик включает/выключает блок + цвет; кисти воды нет — все блоки «с водой») · `FiguresSection` (availableShapeIds + spawnWeights, каждая фигура показана мини-превью через [FigurePreview.tsx](src/widgets/level-editor/ui/FigurePreview.tsx); доступные фигуры идут сеткой `4` в ряд, веса генерации — `2` в ряд) · `BoostersSection` (enabled/count/multiplierValue; зона молотка показана как «4 × 4 (фиксировано)», не редактируется) · `ProtectionSection` (только тумблер enabled — поле стоимости очистки убрано) · `VisualSection` (только `showDebugGrid`; фон и стиль кубиков всегда фиксированы) · `JsonSection` (textarea + ошибки + Импорт).
+  `TemplateSection` (выбор шаблона по `levelId`) · `MainParamsSection` (levelId/targetScore/grid — без названия уровня) · `InitialBoardSection` (интерактивная сетка: клик включает/выключает блок + цвет; кисти воды нет — все блоки «с водой») · `FiguresSection` (availableShapeIds + spawnWeights, каждая фигура показана мини-превью через [FigurePreview.tsx](src/widgets/level-editor/ui/FigurePreview.tsx); доступные фигуры идут сеткой `4` в ряд, веса генерации — `2` в ряд; ниже — подблок **«Стартовые фигуры (скрипт)»**: селект «Заданных наборов: 0/1/2/3» → `figures.scriptedOpening` длиной `N*3`, по 3 слота на набор, в каждом селект `shapeId` («Случайно» + доступные фигуры с `FigurePreview`). Цвет всегда случайный. Снятие фигуры из доступных обнуляет её слоты в скрипте) · `BoostersSection` (enabled/count/multiplierValue; зона молотка показана как «4 × 4 (фиксировано)», не редактируется) · `ProtectionSection` (только тумблер enabled — поле стоимости очистки убрано) · `VisualSection` (только `showDebugGrid`; фон и стиль кубиков всегда фиксированы) · `JsonSection` (textarea + ошибки + Импорт).
 - **[FigurePreview.tsx](src/widgets/level-editor/ui/FigurePreview.tsx)** — чистый React/CSS-grid компонент: по `shapeId` берёт геометрию из `FIGURE_SHAPES` и рисует мини-фигуру (без Pixi). Используется в `FiguresSection` в списке выбора и рядом с весами.
 
 ### GameCore ↔ редактор: ключевая оптимизация
@@ -230,6 +232,7 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 | Задача | Файл(ы) |
 |---|---|
 | Новая фигура / веса | `entities/game/config/figureShapes.ts` |
+| Скрипт стартовых фигур (первые наборы) | `entities/game/lib/figures.ts` (`generateFigureSet` + `scriptedSetIndex`) + `gameFlow.ts` + `gameStore.ts` (`scriptedSetIndex`) + `GameScene.afterClear` + `FiguresSection.tsx` |
 | Новый шаблон уровня | `entities/game/config/defaultLevels.ts` |
 | Правила очков / комбо | `entities/game/lib/scoring.ts` |
 | Размещение / очистка линий | `entities/game/lib/board.ts` |
@@ -273,6 +276,7 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 11. **Анимация защитной очистки поля**: при «Очистить поле» кубики исчезают поп-анимацией (`EffectsLayer.playCellsVanish` через `GameScene.playBoardClear`) — как при очистке линий, но **без** капель воды и начисления очков.
 12. **Спавн-анимация фигур**: три фигуры внизу появляются «попом» со stagger'ом (`FigureLayer.playSpawnAnimation`, гейт по `seenUids`) при старте уровня и регенерации набора.
 13. **Зона молотка зафиксирована 4×4** для всех уровней. Поля `areaRows/areaCols` удалены из `boosters.hammer` (тип, валидация, normalize, все 15 уровней, контролы редактора). Размер задаётся константой `HAMMER_AREA_SIZE` в [HammerController.ts](src/widgets/game-core/pixi/HammerController.ts) (на полях меньше 4 клампится к размеру поля).
+14. **Скрипт стартовых фигур** (`figures.scriptedOpening?: ScriptedFigure[]`, новый тип `ScriptedFigure`): опционально жёстко задаёт фигуры первых наборов (до 3 наборов = 9 фигур). Слот без `shapeId` — случайный; цвет всегда случайный. Потребление отслеживается через `scriptedSetIndex` в `GameState` — **единый источник правды — стор** (initGame → 1; регенерация в `resolvePostMove`/`GameScene.afterClear` и в `clearBoardAndContinue` — +1). Курсор зеркалится в Pixi **отдельным** `GameApplication.setScriptedSetIndex(i)` (не через `updateState`, чтобы не дёргать `renderState`); сцена сообщает свой `nextScriptedSetIndex` обратно колбэком `onScriptedSetIndexUpdate`. `normalize` держит длину `scriptedOpening` кратной 3 (наборы целиком; набор из сплошь случайных слотов сохраняется, чтобы выбор «N наборов» переживал round-trip) и удаляет поле целиком, только если нигде нет ни одного `shapeId`. В редакторе — подблок «Стартовые фигуры (скрипт)» в `FiguresSection`. В ТЗ отсутствует.
 
 Что было унифицировано в ту сессию (для истории):
 1. Next.js зафиксирован как **16** (был «15+» в ТЗ).

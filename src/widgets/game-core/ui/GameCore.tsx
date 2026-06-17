@@ -23,6 +23,7 @@ export default function GameCore({ config }: GameCoreProps) {
   const currentFigures = useGameStore((s) => s.currentFigures);
   const score = useGameStore((s) => s.score);
   const isMultiplierActive = useGameStore((s) => s.isMultiplierActive);
+  const scriptedSetIndex = useGameStore((s) => s.scriptedSetIndex);
   const status = useGameStore((s) => s.status);
   const boosterInventory = useGameStore((s) => s.boosterInventory);
   const activeBooster = useGameStore((s) => s.activeBooster);
@@ -59,6 +60,9 @@ export default function GameCore({ config }: GameCoreProps) {
     },
     onFiguresUpdate: (newFigures) => {
       useGameStore.getState().setCurrentFigures(newFigures);
+    },
+    onScriptedSetIndexUpdate: (index) => {
+      useGameStore.getState().setScriptedSetIndex(index);
     },
     onScoreUpdate: (newScore) => {
       useGameStore.getState().setScore(newScore);
@@ -189,6 +193,7 @@ export default function GameCore({ config }: GameCoreProps) {
       // Initial render using store snapshot at time of mount
       const s = useGameStore.getState();
       gameApp.updateState(s.board, s.currentFigures, s.score, s.isMultiplierActive);
+      gameApp.setScriptedSetIndex(s.scriptedSetIndex);
     });
 
     return () => {
@@ -210,6 +215,14 @@ export default function GameCore({ config }: GameCoreProps) {
     if (!gameAppRef.current) return;
     gameAppRef.current.updateState(board, currentFigures, score, isMultiplierActive);
   }, [board, currentFigures, score, isMultiplierActive]);
+
+  // Mirror only the scripted-opening cursor into the scene. The store is the
+  // single source of truth: the scene reports its computed cursor back via
+  // onScriptedSetIndexUpdate, and this echo just re-assigns the same number
+  // (no render), so the scene's value can never be clobbered with a stale one.
+  useEffect(() => {
+    gameAppRef.current?.setScriptedSetIndex(scriptedSetIndex);
+  }, [scriptedSetIndex]);
 
   // Win / lose stingers.
   useEffect(() => {

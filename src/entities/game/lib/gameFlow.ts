@@ -12,6 +12,8 @@ export type PostMoveResult = {
   figures: FigureInstance[];
   /** True when the previous set was fully placed and a new one was generated. */
   regenerated: boolean;
+  /** Scripted-opening cursor after this move (advances by 1 on regeneration). */
+  nextScriptedSetIndex: number;
 };
 
 /**
@@ -29,16 +31,19 @@ export function resolvePostMove(
   board: BoardCell[][],
   figures: FigureInstance[],
   score: number,
-  config: LevelConfig
+  config: LevelConfig,
+  scriptedSetIndex = 0
 ): PostMoveResult {
   if (checkWinCondition(score, config.targetScore)) {
-    return { outcome: "won", figures, regenerated: false };
+    return { outcome: "won", figures, regenerated: false, nextScriptedSetIndex: scriptedSetIndex };
   }
 
   let nextFigures = figures;
   let regenerated = false;
+  let nextScriptedSetIndex = scriptedSetIndex;
   if (figures.every((f) => f.placed)) {
-    nextFigures = generateFigureSet(config, board);
+    nextFigures = generateFigureSet(config, board, scriptedSetIndex);
+    nextScriptedSetIndex = scriptedSetIndex + 1;
     regenerated = true;
   }
 
@@ -48,8 +53,9 @@ export function resolvePostMove(
       outcome: protectionEnabled ? "protection" : "lost",
       figures: nextFigures,
       regenerated,
+      nextScriptedSetIndex,
     };
   }
 
-  return { outcome: "playing", figures: nextFigures, regenerated };
+  return { outcome: "playing", figures: nextFigures, regenerated, nextScriptedSetIndex };
 }

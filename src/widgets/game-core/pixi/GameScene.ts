@@ -37,6 +37,8 @@ export type GameSceneCallbacks = {
    * over an empty area resolves with `false` and no charge is spent.
    */
   onHammerComplete: (consumed: boolean) => void;
+  /** Fired when figure regeneration advances the scripted-opening cursor. */
+  onScriptedSetIndexUpdate: (index: number) => void;
 };
 
 export class GameScene extends Container {
@@ -53,6 +55,8 @@ export class GameScene extends Container {
   private isMultiplierActive: boolean = false;
   /** Configured multiplier value (from config.boosters.multiplier), default 2. */
   private multiplierValue: number = 2;
+  /** Scripted-opening cursor mirrored from the store (advanced on regeneration). */
+  private scriptedSetIndex: number = 0;
 
   /** Hammer booster selection input (block removal stays in this scene). */
   private hammer: HammerController;
@@ -166,6 +170,11 @@ export class GameScene extends Container {
     this.figureLayer.draw(figures, SCENE_W, SCENE_H, cellSize);
   }
 
+  /** Mirror the scripted-opening cursor from the store (the single source of truth). */
+  setScriptedSetIndex(index: number) {
+    this.scriptedSetIndex = index;
+  }
+
   // ─── Placement Logic ──────────────────────────────────────────
 
   /**
@@ -269,12 +278,14 @@ export class GameScene extends Container {
    * Shared by the cleared-line and no-clear paths.
    */
   private afterClear() {
-    const result = resolvePostMove(this.board, this.figures, this.score, this.config);
+    const result = resolvePostMove(this.board, this.figures, this.score, this.config, this.scriptedSetIndex);
 
     // Apply a freshly generated set (when the previous one was fully placed).
     if (result.regenerated) {
       this.figures = result.figures;
+      this.scriptedSetIndex = result.nextScriptedSetIndex;
       this.callbacks?.onFiguresUpdate(this.figures);
+      this.callbacks?.onScriptedSetIndexUpdate(this.scriptedSetIndex);
     }
 
     if (result.outcome === "won") {

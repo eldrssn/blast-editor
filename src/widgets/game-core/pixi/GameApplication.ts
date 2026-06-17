@@ -97,6 +97,16 @@ export class GameApplication {
     this.scene.renderState(board, figures, score, isMultiplierActive);
   }
 
+  /**
+   * Mirror the scripted-opening cursor into the scene. Kept separate from
+   * `updateState` so a cursor-only sync (e.g. the echo after the scene's own
+   * regeneration) never triggers a full board/figure re-render.
+   */
+  setScriptedSetIndex(scriptedSetIndex: number) {
+    if (!this.scene || this._destroyed) return;
+    this.scene.setScriptedSetIndex(scriptedSetIndex);
+  }
+
   // ─── Booster proxies (React -> Pixi) ──────────────────────────
 
   /** Run the Collect All booster. Returns true if cells were cleared. */

@@ -5,6 +5,15 @@ export type BoardCellConfig = {
   color?: string;
 };
 
+/**
+ * Одна заранее заданная фигура стартового скрипта. `shapeId` отсутствует
+ * (или индекс вышел за длину массива) → этот слот заполняется обычным
+ * взвешенным рандомом. Цвет всегда случайный, поэтому в скрипте не хранится.
+ */
+export type ScriptedFigure = {
+  shapeId?: string;
+};
+
 export type LevelConfig = {
   levelId: string;
   grid: {
@@ -17,6 +26,12 @@ export type LevelConfig = {
     availableShapeIds: string[];
     spawnWeights: Record<string, number>;
     colors: string[];
+    /**
+     * Опциональный скрипт стартовых фигур: плоский упорядоченный список до 9
+     * элементов (до 3 наборов по 3). Слот набора S, позиция i (0..2) берётся из
+     * scriptedOpening[S*3 + i]. Пустой/отсутствует → весь спавн случайный.
+     */
+    scriptedOpening?: ScriptedFigure[];
   };
   boosters: {
     collectAll: {
@@ -90,6 +105,8 @@ export type GameState = {
   activeBooster: BoosterType | null;
   isMultiplierActive: boolean;
   boosterInventory: Record<BoosterType, number>;
+  /** Сколько стартовых наборов уже взято из figures.scriptedOpening. */
+  scriptedSetIndex: number;
 };
 
 export type GridPosition = {

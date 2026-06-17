@@ -78,6 +78,29 @@ export function validateLevelConfig(config: Partial<LevelConfig> | null | undefi
         }
       });
     }
+
+    // scriptedOpening — опционально: до 9 фигур (до 3 наборов), каждый заданный
+    // shapeId должен быть известным и входить в availableShapeIds.
+    const scriptedOpening = config.figures.scriptedOpening;
+    if (scriptedOpening !== undefined) {
+      if (!Array.isArray(scriptedOpening)) {
+        errors.push("Стартовый скрипт (figures.scriptedOpening) должен быть массивом.");
+      } else {
+        if (scriptedOpening.length > 9) {
+          errors.push("Стартовый скрипт (figures.scriptedOpening) не может превышать 9 фигур (3 набора).");
+        }
+        const availableSet = new Set(Array.isArray(availableShapeIds) ? availableShapeIds : []);
+        scriptedOpening.forEach((entry, i) => {
+          const id = entry?.shapeId;
+          if (id === undefined) return; // пустой слот = случайная фигура
+          if (!KNOWN_SHAPE_IDS.has(id)) {
+            errors.push(`Стартовый скрипт: неизвестный ID фигуры '${id}' в позиции ${i + 1}.`);
+          } else if (!availableSet.has(id)) {
+            errors.push(`Стартовый скрипт: фигура '${id}' (позиция ${i + 1}) не входит в доступные фигуры уровня.`);
+          }
+        });
+      }
+    }
   }
 
   // boosters

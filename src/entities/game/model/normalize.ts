@@ -1,4 +1,4 @@
-import { LevelConfig, BoardCellConfig } from "./types";
+import { LevelConfig, BoardCellConfig, ScriptedFigure } from "./types";
 
 export function normalizeLevelConfig(config: Partial<LevelConfig> | null | undefined): LevelConfig {
   const levelId = config?.levelId || "custom_level";
@@ -43,6 +43,22 @@ export function normalizeLevelConfig(config: Partial<LevelConfig> | null | undef
 
   const colors = config?.figures?.colors || ["#FF708A", "#3CD070", "#3C70FF", "#F59E0B", "#B070FF"];
 
+  // Scripted opening: up to 9 entries (3 sets). Keep a shapeId only when it is a
+  // known available shape; anything else collapses to a random slot ({}).
+  const availableSet = new Set(availableShapeIds);
+  const rawScripted = Array.isArray(config?.figures?.scriptedOpening) ? config!.figures!.scriptedOpening! : [];
+  const normalizedScripted: ScriptedFigure[] = rawScripted.slice(0, 9).map((entry) => {
+    const id = entry?.shapeId;
+    return id && availableSet.has(id) ? { shapeId: id } : {};
+  });
+  // The editor scripts whole sets of 3, so keep the length set-aligned: the
+  // chosen set count (including sets left fully random) must survive the
+  // round-trip and keep showing in the editor. Only when nothing at all is
+  // pinned is the script a no-op — then drop the field so configs stay clean.
+  while (normalizedScripted.length % 3 !== 0) normalizedScripted.push({});
+  const hasPinnedScript = normalizedScripted.some((e) => e.shapeId);
+  if (!hasPinnedScript) normalizedScripted.length = 0;
+
   const boosters = {
     collectAll: {
       enabled: config?.boosters?.collectAll?.enabled !== false,
@@ -79,7 +95,8 @@ export function normalizeLevelConfig(config: Partial<LevelConfig> | null | undef
     figures: {
       availableShapeIds,
       spawnWeights: normalizedWeights,
-      colors
+      colors,
+      ...(normalizedScripted.length > 0 ? { scriptedOpening: normalizedScripted } : {})
     },
     boosters,
     protectionFromLoss,

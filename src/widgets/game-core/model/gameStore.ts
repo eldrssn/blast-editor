@@ -17,6 +17,8 @@ export type GameStoreState = GameState & {
    * never corrupts the state or wastes a charge.
    */
   activateMultiplier: () => void;
+  /** Sync the scripted-opening cursor from the Pixi scene back into the store. */
+  setScriptedSetIndex: (index: number) => void;
   /**
    * Protection-from-loss clear: wipe the whole board and resume play.
    * No score is awarded for a protection clear (per level rules).
@@ -38,6 +40,7 @@ const defaultState: GameState = {
     multiplier: 0,
     hammer: 0,
   },
+  scriptedSetIndex: 0,
 };
 
 export const useGameStore = create<GameStoreState>((set, get) => ({
@@ -45,7 +48,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   initGame: (config: LevelConfig) => {
     const board = createEmptyBoard(config.grid.rows, config.grid.cols, config.initialBoard);
-    const currentFigures = generateFigureSet(config, board);
+    // First set uses scripted-opening slot 0; the cursor then points at set 1.
+    const currentFigures = generateFigureSet(config, board, 0);
 
     set({
       status: "playing",
@@ -61,6 +65,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         multiplier: config.boosters?.multiplier?.initialCount ?? 0,
         hammer: config.boosters?.hammer?.initialCount ?? 0,
       },
+      scriptedSetIndex: 1,
     });
   },
 
@@ -86,6 +91,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     }
   },
 
+  setScriptedSetIndex: (scriptedSetIndex: number) => set({ scriptedSetIndex }),
+
   activateMultiplier: () => {
     const { status, isMultiplierActive, boosterInventory } = get();
     if (status !== "playing") return;
@@ -101,7 +108,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   },
 
   clearBoardAndContinue: () => {
-    const { config, currentFigures, score } = get();
+    const { config, currentFigures, score, scriptedSetIndex } = get();
     if (!config) return;
 
     // Fully empty board — protection clear wipes obstacles too.
@@ -109,11 +116,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     // Any figures still unplaced now fit on the empty board, but if the whole
     // set was already placed we generate a fresh one so the player can keep going.
-    const figures = currentFigures.every((f) => f.placed)
-      ? generateFigureSet(config, board)
-      : currentFigures;
+    const regenerate = currentFigures.every((f) => f.placed);
+    const figures = regenerate ? generateFigureSet(config, board, scriptedSetIndex) : currentFigures;
+    const nextScriptedSetIndex = regenerate ? scriptedSetIndex + 1 : scriptedSetIndex;
 
     // Tester build: the protection clear is free — no score is deducted.
-    set({ board, currentFigures: figures, status: "playing", score });
+    set({ board, currentFigures: figures, status: "playing", score, scriptedSetIndex: nextScriptedSetIndex });
   },
 }));
