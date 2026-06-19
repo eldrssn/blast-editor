@@ -6,6 +6,16 @@ import { DEFAULT_LEVELS } from "@/entities/game/config/defaultLevels";
 import { normalizeLevelConfig } from "@/entities/game/model/normalize";
 import { validateLevelConfig } from "@/entities/game/model/validation";
 
+function cloneLevelConfig(config: LevelConfig): LevelConfig {
+  if (typeof globalThis.structuredClone === "function") {
+    return globalThis.structuredClone(config);
+  }
+
+  // LevelConfig is kept JSON-serializable, so JSON clone is a safe fallback
+  // for older Android WebViews that don't implement structuredClone.
+  return JSON.parse(JSON.stringify(config)) as LevelConfig;
+}
+
 /**
  * State + handlers for the level editor, kept out of the LevelEditor view so the
  * widget only wires data into the form/preview. Owns the edited config, the
@@ -72,7 +82,7 @@ export function useLevelEditor(initialLevel: LevelConfig = DEFAULT_LEVELS[0]) {
 
   const handleApply = () => {
     if (validationErrors.length === 0) {
-      setAppliedConfig(structuredClone(editConfig));
+      setAppliedConfig(cloneLevelConfig(editConfig));
       notify("success", "Конфигурация применена к игре");
       return true;
     }
@@ -82,7 +92,7 @@ export function useLevelEditor(initialLevel: LevelConfig = DEFAULT_LEVELS[0]) {
   };
 
   const handleReset = () => {
-    const restoredConfig = structuredClone(appliedConfig);
+    const restoredConfig = cloneLevelConfig(appliedConfig);
     applyEditConfig(restoredConfig);
     setSelectedTemplateId(getTemplateSelectionId(restoredConfig.levelId));
     setJsonError(null);
