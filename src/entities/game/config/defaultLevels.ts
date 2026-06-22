@@ -42,7 +42,7 @@ function paintBoard(
   return board;
 }
 
-export const DEFAULT_LEVELS: LevelConfig[] = [
+const BASE_LEVELS: LevelConfig[] = [
   {
     levelId: "level_1",
     grid: { rows: 8, cols: 8 },
@@ -403,3 +403,54 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     visual: { backgroundId: "wood_royal", cubeStyle: "pseudo3d", showDebugGrid: false }
   }
 ];
+
+const TOTAL_LEVELS = 60;
+const BACKGROUNDS = ["wood_classic", "wood_dark", "wood_royal"] as const;
+
+/**
+ * Дублирует начальное поле базового уровня, чтобы у каждого
+ * сгенерированного уровня была своя независимая матрица.
+ */
+function cloneBoard(
+  board: Array<Array<BoardCellConfig | null>>
+): Array<Array<BoardCellConfig | null>> {
+  return board.map((row) => row.map((cell) => (cell ? { ...cell } : null)));
+}
+
+/**
+ * Генерирует уровни 16…60, циклически переиспользуя 15 ручных шаблонов
+ * и плавно повышая сложность (растёт targetScore, чуть больше бустеров).
+ */
+function generateLevels(): LevelConfig[] {
+  const generated: LevelConfig[] = [];
+  for (let i = BASE_LEVELS.length; i < TOTAL_LEVELS; i++) {
+    const template = BASE_LEVELS[i % BASE_LEVELS.length];
+    const levelNumber = i + 1;
+    // Сложность растёт по «кругам» переиспользования шаблонов.
+    const lap = Math.floor(i / BASE_LEVELS.length);
+    generated.push({
+      ...template,
+      levelId: `level_${levelNumber}`,
+      targetScore: Math.round(template.targetScore * (1 + lap * 0.35)),
+      initialBoard: cloneBoard(template.initialBoard),
+      figures: {
+        ...template.figures,
+        spawnWeights: { ...template.figures.spawnWeights },
+        colors: [...template.figures.colors]
+      },
+      boosters: {
+        collectAll: { ...template.boosters.collectAll },
+        multiplier: { ...template.boosters.multiplier },
+        hammer: { ...template.boosters.hammer }
+      },
+      protectionFromLoss: { ...template.protectionFromLoss },
+      visual: {
+        ...template.visual,
+        backgroundId: BACKGROUNDS[(levelNumber - 1) % BACKGROUNDS.length]
+      }
+    });
+  }
+  return generated;
+}
+
+export const DEFAULT_LEVELS: LevelConfig[] = [...BASE_LEVELS, ...generateLevels()];
