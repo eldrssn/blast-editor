@@ -1,6 +1,6 @@
-import { Container, Graphics, Text, TextStyle } from "pixi.js";
-import { getCubeContext } from "./cubeContext";
+import { Container, Graphics, Sprite, Text, TextStyle } from "pixi.js";
 import { ClearedCellCoord } from "@/entities/game/model/types";
+import { getCubeTexture } from "@/shared/lib/gameAssets";
 
 type GridInfo = {
   cellSize: number;
@@ -64,6 +64,9 @@ export class EffectsLayer extends Container {
   constructor() {
     super();
     this.zIndex = 100;
+    // Order children by zIndex so the combo label can sit above the cube-vanish
+    // sprites even though those are spawned after it within the same clear.
+    this.sortableChildren = true;
     // Effects must never intercept pointer events meant for the board/figures.
     this.eventMode = "none";
   }
@@ -230,11 +233,17 @@ export class EffectsLayer extends Container {
     const size = grid.cellSize;
     const cx = grid.boardOffsetX + cell.col * cellFull + size / 2;
     const cy = grid.boardOffsetY + cell.row * cellFull + size / 2;
-    const color = cell.color ?? "#5eb1ff";
+    const color = cell.color ?? "red";
 
-    const cube = new Graphics(getCubeContext(color, size));
-    cube.pivot.set(size / 2, size / 2);
+    const cube = new Sprite(getCubeTexture(color));
+    cube.anchor.set(0.5);
     cube.position.set(cx, cy);
+    cube.width = size;
+    cube.height = size;
+    // Setting width/height fits the texture to the cell; capture that base scale
+    // so the tween multiplies it instead of overwriting it (which would blow the
+    // cube up to the texture's native pixel size).
+    const baseScale = cube.scale.x;
     this.addChild(cube);
 
     this.addTween({
@@ -242,9 +251,9 @@ export class EffectsLayer extends Container {
       delay,
       ease: easeInCubic,
       onUpdate: (t) => {
-        // Pop up to 1.25x in the first third, then collapse to 0.
-        const scale = t < 0.35 ? 1 + (t / 0.35) * 0.25 : 1.25 * (1 - (t - 0.35) / 0.65);
-        cube.scale.set(Math.max(scale, 0));
+        // Hold the cube at its cell size briefly, then collapse it — no pop-up.
+        const scale = t < 0.15 ? 1 : 1 - (t - 0.15) / 0.85;
+        cube.scale.set(baseScale * Math.max(scale, 0));
         cube.alpha = 1 - Math.max(0, (t - 0.4) / 0.6);
         cube.rotation = t * 0.35;
       },
@@ -335,6 +344,8 @@ export class EffectsLayer extends Container {
     });
     label.anchor.set(0.5);
     label.position.set(cx, cy);
+    // Always render above the pop-cubes / droplets of the same clear.
+    label.zIndex = 1000;
     this.addChild(label);
 
     this.addTween({

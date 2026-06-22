@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { LevelConfig, BoardCellConfig } from "@/entities/game/model/types";
+import { LevelConfig, BoardCellConfig, CubeColorId } from "@/entities/game/model/types";
+import { CUBE_COLOR_IDS, getCubeAssetUrl } from "@/shared/lib/gameColors";
 import styles from "../../styles/EditorForm.module.scss";
 
 type Props = {
@@ -9,12 +10,12 @@ type Props = {
   onChange: (config: LevelConfig) => void;
 };
 
-const FALLBACK_COLORS = ["#FF708A", "#3CD070", "#3C70FF", "#F59E0B", "#B070FF"];
+const FALLBACK_COLORS: CubeColorId[] = [...CUBE_COLOR_IDS];
 
 export default function InitialBoardSection({ config, onChange }: Props) {
-  const boardColors = config.figures?.colors?.length ? config.figures.colors : FALLBACK_COLORS;
+  const boardColors: CubeColorId[] = config.figures?.colors?.length ? config.figures.colors : FALLBACK_COLORS;
 
-  const [brushColorRaw, setBrushColor] = React.useState<string>(boardColors[0]);
+  const [brushColorRaw, setBrushColor] = React.useState<CubeColorId>(boardColors[0]);
 
   // Keep the brush valid if the level's colour palette no longer contains it,
   // without an effect — derive the effective colour each render instead.
@@ -86,8 +87,10 @@ export default function InitialBoardSection({ config, onChange }: Props) {
             onClick={() => setBrushColor(color)}
             title={color}
             className={`${styles.swatch} ${color === brushColor ? styles.swatchActive : ""}`}
-            style={{ background: color }}
-          />
+            style={{ backgroundImage: `url(${getCubeAssetUrl(color)})` }}
+          >
+            <span className={styles.srOnly}>{color}</span>
+          </button>
         ))}
       </div>
 
@@ -105,7 +108,7 @@ export default function InitialBoardSection({ config, onChange }: Props) {
                   onClick={() => handleCellClick(r, c)}
                   title={`[${r}, ${c}]`}
                   className={`${styles.boardCell} ${filled ? styles.boardCellFilled : ""}`}
-                  style={filled ? { background: cell?.color || "#FF708A" } : undefined}
+                  style={filled && cell?.color ? { backgroundImage: `url(${getCubeAssetUrl(cell.color)})` } : undefined}
                 />
               );
             })

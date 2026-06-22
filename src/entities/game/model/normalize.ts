@@ -1,4 +1,5 @@
 import { LevelConfig, BoardCellConfig, ScriptedFigure } from "./types";
+import { CUBE_COLOR_IDS, normalizeCubeColorId } from "@/shared/lib/gameColors";
 
 export function normalizeLevelConfig(config: Partial<LevelConfig> | null | undefined): LevelConfig {
   const levelId = config?.levelId || "custom_level";
@@ -16,7 +17,7 @@ export function normalizeLevelConfig(config: Partial<LevelConfig> | null | undef
         if (configRow && configRow[c]) {
           row.push({
             filled: !!configRow[c]?.filled,
-            color: configRow[c]?.color || "#FF708A"
+            color: normalizeCubeColorId(configRow[c]?.color)
           });
         } else {
           row.push(null);
@@ -41,7 +42,10 @@ export function normalizeLevelConfig(config: Partial<LevelConfig> | null | undef
     normalizedWeights[id] = spawnWeights[id] !== undefined ? spawnWeights[id] : 10;
   });
 
-  const colors = config?.figures?.colors || ["#FF708A", "#3CD070", "#3C70FF", "#F59E0B", "#B070FF"];
+  const colors =
+    config?.figures?.colors && config.figures.colors.length > 0
+      ? config.figures.colors.map((color) => normalizeCubeColorId(color))
+      : [...CUBE_COLOR_IDS];
 
   // Scripted opening: up to 9 entries (3 sets). Keep a shapeId only when it is a
   // known available shape; anything else collapses to a random slot ({}).

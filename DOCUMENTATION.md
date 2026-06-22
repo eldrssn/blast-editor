@@ -59,8 +59,7 @@ src/
         EffectsLayer.ts     # частицы воды, pop-анимации, combo-лейбл
         HudLayer.ts         # прогресс-бар воды, счёт, x2-индикатор
         HammerController.ts # ввод режима молотка (выбор области 4×4)
-        cube.ts             # drawPseudo3DCube — псевдо-3D куб
-        cubeContext.ts      # getCubeContext — кэш GraphicsContext по цвету+размеру
+    cube.ts             # только CORNER_RADIUS=5 (скругление клеток/подсветок)
       styles/GameCore.module.scss
     # (sound) shared/lib/sound.ts — заглушка soundManager под будущие аудио-файлы
     level-editor/
@@ -75,6 +74,8 @@ src/
       styles/HomeGameScreen.module.scss
 
   shared/lib/sound.ts       # soundManager (singleton, синтез WAV → Howler)
+  shared/lib/gameColors.ts  # pure (без Pixi): CUBE_COLOR_IDS/GRID_BOX_IDS + типы, пути ассетов, normalize/validate-хелперы
+  shared/lib/gameAssets.ts  # Pixi-загрузка текстур (getCubeTexture/getGridTexture/preload), реэкспорт gameColors
 ```
 
 ---
@@ -91,7 +92,7 @@ type LevelConfig = {
   figures: {
     availableShapeIds: string[];
     spawnWeights: Record<string, number>;
-    colors: string[];
+    colors: ("green"|"orange"|"purple"|"red"|"yellow")[];
     scriptedOpening?: ScriptedFigure[];  // опц. скрипт старта: до 9 фигур (3 набора по 3); пусто/нет → весь спавн случайный
   };
   boosters: {
@@ -102,15 +103,15 @@ type LevelConfig = {
   protectionFromLoss: { enabled: boolean };  // тест-сборка: очистка поля бесплатна, стоимости нет
   visual: {
     backgroundId: string;   // фон фиксирован (в редакторе не меняется), берётся из дефолтов
-    cubeStyle: "pseudo3d";  // единственный стиль (в редакторе не меняется)
+    cubeStyle: "pseudo3d";  // legacy-поле совместимости; runtime использует sprite-ассеты из public/game
     showDebugGrid: boolean; // отладочная сетка поверх поля (рабочий тумблер)
   };
 };
 ```
 
 ### Прочие типы
-- `BoardCell` = `{ id; filled; color?; figureId? }` — `id` в формате `"r-c"`. Поле «вода» убрано — все кубики считаются «с водой» (капли при очистке летят на каждую клетку).
-- `BoardCellConfig` = `{ filled; color? }` — для `initialBoard`.
+- `BoardCell` = `{ id; filled; color?; figureId? }` — `id` в формате `"r-c"`. `color` хранит **asset-id** (`green|orange|purple|red|yellow`), а не hex. Поле «вода» убрано — все кубики считаются «с водой» (капли при очистке летят на каждую клетку).
+- `BoardCellConfig` = `{ filled; color? }` — для `initialBoard`; цвет тоже asset-id.
 - `ScriptedFigure` = `{ shapeId? }` — один слот стартового скрипта. Нет `shapeId` (или индекс вышел за длину) → слот случайный. Цвет в скрипте не хранится (всегда случайный).
 - `FigureShape` = `{ id; cells: {row,col}[] }`; `FigureInstance` = `{ uid; shapeId; cells; color; placed }`.
 - `GameStatus` = `idle | playing | dragging | booster_selecting | protection_from_loss | won | lost`.
@@ -170,12 +171,12 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 - **GameApplication** — владеет `Application`, монтирует canvas, `ResizeObserver` с rAF-коалесингом, letterbox-масштаб сцены (`scale = min(scaleX, scaleY)`), DPR cap = 2, `antialias` всегда включён. Прокси-методы: `collectAll/enterHammerMode/confirmHammerMode/exitHammerMode/setTickerActive/applyVisualConfig/updateState/setScriptedSetIndex`. `updateState(board, figures, score, isMultiplierActive?)` рисует борд/фигуры/HUD; курсор скрипта зеркалится **отдельным** лёгким `setScriptedSetIndex(i)` → `GameScene.setScriptedSetIndex` (намеренно не в `updateState`, чтобы синк только курсора — эхо после регенерации в сцене — не вызывал лишний `renderState`).
 - **GameScene** — оркестратор. Держит `board/figures/score/isMultiplierActive/multiplierValue`. Держит также `scriptedSetIndex` — зеркало курсора скрипта; **единый источник правды — стор**, сцена в `afterClear` при регенерации считает `nextScriptedSetIndex` и шлёт его в стор через `onScriptedSetIndexUpdate`, а GameCore синкает значение обратно в зеркало (эхо безопасно: это только присвоение числа, без рендера). Здесь вся **placement-логика** (`handlePlacementAttempt` → `handlePlacementSuccess` → `awardAndAnimateClear` → `afterClear`/`resolvePostMove`) и **исполнение бустеров** (`collectAll`, `applyHammerAt`). `playBoardClear(onComplete)` — анимированная защитная очистка: собирает `filled`-клетки, опустошает борд визуально и проигрывает `EffectsLayer.playCellsVanish` (поп-кубы **без** воды/очков); фактический wipe+регенерацию делает стор в `onComplete` (проброшен из [GameApplication](src/widgets/game-core/pixi/GameApplication.ts) → [GameCore](src/widgets/game-core/ui/GameCore.tsx)). Единый `Ticker` гоняет левитацию + анимацию HUD + рамку молотка; `setTickerActive(false)` останавливает его на оверлеях.
   - `applyVisualConfig(config)` — горячее применение **косметики** (фон, лейбл уровня, targetScore, multiplierValue, `showDebugGrid`) без перестройки сцены.
-- **BoardLayer** — сетка, пул кубов (`acquireCube`), `showHighlight` (зелёный/красный placement), `showHammerArea`+`tickHammer` (пульсация рамки), `getGridInfo()` (cellSize/offset — единый источник координат), `setShowDebugGrid(bool)`/`renderDebugGrid` (отладочная сетка границ клеток поверх поля).
-- **FigureLayer** — слоты внизу, `updateLevitation`, drag-and-drop (`onFigurePointerDown/onPointerMove/onPointerUp`), `getGridPositionFromPointer`, `playBounceAnimation`, `animateReturnToSlot`. Колбэки в сцену: `getGridInfo/canPlaceAt/onHighlightUpdate/onPlacementAttempt/onPlacementSuccess`. `FigureLayer.slotHeight` / `FigureLayer.boosterBand` — статик. **Идемпотентный `draw`:** через `renderedKeys[slot]` (uid фигуры) графика слота пересоздаётся только при смене фигуры — посторонние ре-рендеры (board/score за одну установку) больше не пересоздают неизменные фигуры и не сбрасывают их левитацию (был «прыжок» при установке). Перетаскивание сбрасывает ключ слота (`redrawSlotWithoutFigure`). **Спавн-анимация:** новые фигуры (новые `uid` — initGame/регенерация) появляются «попом» (scale 0→1 `easeOutBack` + fade) со stagger'ом `SPAWN_STAGGER_MS` между слотами; `seenUids` гарантирует, что возврат той же фигуры в слот после неудачного дропа не анимируется повторно (`playSpawnAnimation`).
-- **EffectsLayer** — `playLineClear` (pop-кубы + капли воды `spawnDroplet`/`spawnSplash` летят в HUD + combo-лейбл `showCombo` при ≥2 линий) и `playCellsVanish` (те же поп-кубы **без** воды/очков — для защитной очистки поля). Общий поп вынесен в `popCube`. Свой tween-loop, пул графики. Эффекты всегда включены (тумблера нет).
+- **BoardLayer** — поле целиком на sprite-ассетах из `public/game`: под всей сеткой сначала рисуется отдельная тёплая **board-base** подложка; её цвет сейчас взят из пользовательского swatch-референса и затем затемнён в `2x` (текущий тон ≈ `#180501`), чтобы подложка попадала в более глубокий почти-чёрный бордово-коричневый диапазон. Подложка лежит под socket-тайлами и кубами и автоматически проявляется в зазорах между клетками и в прозрачных углах спрайтов. Поверх неё под **каждой** клеткой рисуется socket-тайл — детерминированный микс `box-1/box-2/box-3` (`getStableGridBoxId`, чтобы рисунок не мигал между re-render), а для заполненных клеток поверх тайла кладётся cube-sprite из пула по `BoardCell.color`. Тайл под кубом обязателен: у куба глянцевые скруглённые (прозрачные) углы, иначе куб выглядел бы как замена клетки, а не блок на ней. Между тайлами и кубами — `shadowGraphics`: мягкая контактная тень под каждой заполненной клеткой, смещённая влево-вниз (`CUBE_SHADOW_DX/DY/ALPHA`), читается как свет сверху-справа; сам ассет куба не трогается. Поверх этого: `showHighlight`, `showHammerArea`+`tickHammer`, `getGridInfo()` и `setShowDebugGrid(bool)`/`renderDebugGrid`.
+- **FigureLayer** — слоты внизу, `updateLevitation`, drag-and-drop (`onFigurePointerDown/onPointerMove/onPointerUp`), `getGridPositionFromPointer`, `playBounceAnimation`, `animateReturnToSlot`. Колбэки в сцену: `getGridInfo/canPlaceAt/onHighlightUpdate/onPlacementAttempt/onPlacementSuccess`. `FigureLayer.slotHeight` / `FigureLayer.boosterBand` — статик. Фигуры в слотах и drag-preview собираются из sprite-кубиков того же asset-id, что и поле (`createFigureVisual`), и под каждым кубиком — такая же направленная тень влево-вниз (свет сверху-справа), как на поле; масштабируется по размеру клетки, рисуется позади кубиков. Drag-preview больше **не** имеет отдельной «парящей» тени — использует ту же per-cube тень. **Идемпотентный `draw`:** через `renderedKeys[slot]` (uid фигуры) графика слота пересоздаётся только при смене фигуры — посторонние ре-рендеры (board/score за одну установку) больше не пересоздают неизменные фигуры и не сбрасывают их левитацию (был «прыжок» при установке). Перетаскивание сбрасывает ключ слота (`redrawSlotWithoutFigure`). **Возврат в слот:** `animateReturnToSlot(container, slotIndex, figure, onComplete)` пивотит drag-контейнер вокруг центра фигуры (с компенсацией позиции) и едет в центр слота — иначе при scale-down вокруг угла фигура «уезжала» в правый-нижний угол и только потом стягивалась в центр. **Спавн-анимация:** новые фигуры (новые `uid` — initGame/регенерация) появляются «попом» (scale 0→1 `easeOutBack` + fade) со stagger'ом `SPAWN_STAGGER_MS` между слотами; `seenUids` гарантирует, что возврат той же фигуры в слот после неудачного дропа не анимируется повторно (`playSpawnAnimation`).
+- **EffectsLayer** — `playLineClear` (pop-кубы + капли воды `spawnDroplet`/`spawnSplash` летят в HUD + combo-лейбл `showCombo` при ≥2 линий) и `playCellsVanish` (те же pop-кубы **без** воды/очков — для защитной очистки поля). Pop-куб теперь тоже sprite по asset-id очищаемой клетки; вода/label по-прежнему procedural. Свой tween-loop, пул графики. Эффекты всегда включены (тумблера нет). **z-order:** слой включает `sortableChildren`, а combo-лейбл получает `zIndex=1000`, чтобы он был поверх pop-кубов/капель того же клира (раньше кубы добавлялись после лейбла и перекрывали его).
 - **HudLayer** — прогресс-бар воды + счёт `0/target`, лейбл уровня (`formatLevelLabel(levelId)` → «Уровень N», число берётся из `levelId`), `tick` (плавный счётчик), `pulse`, `snapScore`, `getWaterTargetPoint()` (цель для капель), x2-индикатор при активном множителе.
 - **HammerController** — только ввод режима молотка: `enter/confirm/cancel`, отслеживание области под указателем; размер зоны **всегда 4×4** (экспортируемая константа `HAMMER_AREA_SIZE`, на маленьких полях клампится к размеру поля) — больше не берётся из конфига. На тач-экранах `pointerup` больше не применяет бустер: область выбирается жестом, а применение вызывается отдельно через `confirm()` → `GameScene.applyHammerAt`.
-- **cube.ts / cubeContext.ts** — `drawPseudo3DCube` (основной цвет, тёмная нижняя грань, highlight, тень, скругление `CORNER_RADIUS=5`, `DEPTH=5`); `getCubeContext` кэширует `GraphicsContext` по `цвет+размер`.
+- **cube.ts** — только `CORNER_RADIUS=5` (скругление клеток поля и подсветок). Процедурная отрисовка кубов (`drawPseudo3DCube`) и кэш `GraphicsContext` (`cubeContext.ts`) удалены — кубы и фон-плитки рисуются sprite'ами из текстур (`gameAssets.ts`). **Важно:** pop-куб в `EffectsLayer` задаёт размер через `width/height`, поэтому scale-tween умножает на базовый масштаб (`baseScale = cube.scale.x`), а не задаёт абсолютный — иначе спрайт раздулся бы до нативного размера текстуры (поворот при этом сохранён, увеличения нет).
 
 ### Бустеры — логика consume
 - **collectAll**: `GameScene.collectAll()` возвращает `false` если борд пуст или активен молоток → заряд **не** тратится. React списывает заряд только при `true`.
@@ -208,12 +209,12 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 ## 8. Конфиги и контент
 
 - **[figureShapes.ts](src/entities/game/config/figureShapes.ts)** — `FIGURE_SHAPES` (15 фигур, id `"1"`…`"15"`) + `DEFAULT_FIGURE_WEIGHTS` (веса спавна; `"1"`=16 … `"15"`=1).
-- **[defaultLevels.ts](src/entities/game/config/defaultLevels.ts)** — **15 уровней** (`level_1`…`level_15`, без поля `title`), все уровни используют поле **`8×8`**; кривая сложности строится через `targetScore`, число и крупность фигур, плотность препятствий; защита от поражения у всех включена и **бесплатна** (стоимость очистки убрана); инвентарь бустеров беднеет, фоны циклятся classic/dark/royal. Препятствия рисуются хелпером `paintBoard(rows, cols, set => …)` (out-of-bounds игнорируется).
+- **[defaultLevels.ts](src/entities/game/config/defaultLevels.ts)** — **15 уровней** (`level_1`…`level_15`, без поля `title`), все уровни используют поле **`8×8`**; кривая сложности строится через `targetScore`, число и крупность фигур, плотность препятствий; защита от поражения у всех включена и **бесплатна** (стоимость очистки убрана); инвентарь бустеров беднеет, фоны циклятся classic/dark/royal. Препятствия рисуются хелпером `paintBoard(rows, cols, set => …)` (out-of-bounds игнорируется). Цветовая палитра уровня теперь хранится как asset-id: `green`, `orange`, `purple`, `red`, `yellow`.
   - `level_1` target 60 (8×8) · `level_2` 120 · `level_3` 200 — исходное «ядро».
   - `level_4`–`level_8`: 90→200, чистое поле → углы/полоса/блоки 2×2 на `8×8`.
   - `level_9`–`level_12`: 240→360, только крупные фигуры / диагонали / рассыпка, но всё ещё на `8×8`.
   - `level_13`–`level_15`: 300→520, плотные паттерны препятствий и финальный упор на фигуру `15` с множителем ×3, тоже на `8×8`.
-  - `defaultColors`: Rose `#FF708A`, Emerald `#3CD070`, Cobalt `#3C70FF`, Amber `#F59E0B`, Purple `#B070FF` (+ именованные константы `ROSE/EMERALD/COBALT/AMBER/PURPLE`).
+  - `defaultColors`: `green`, `orange`, `purple`, `red`, `yellow` (+ именованные константы `GREEN/ORANGE/PURPLE/RED/YELLOW`).
 
 ---
 
@@ -241,7 +242,9 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 | Бустер-UI / оверлеи / окно подтверждения | `GameCore.tsx` (`pendingBooster`, `isHammerSelecting`) |
 | Порядок раскладки / полоса бустеров | `FigureLayer.boosterBand` + `GameScene.renderState` + `GameCore.module.scss` (`.boosterBar`) |
 | Кламп очков по цели | `GameScene.awardAndAnimateClear` (`onScoreArrive`) |
-| Внешний вид куба | `pixi/cube.ts`, `pixi/cubeContext.ts` |
+| Палитра/ID цветов и плиток, normalize/validate-хелперы | `shared/lib/gameColors.ts` (pure) |
+| Загрузка/preload текстур (Pixi) | `shared/lib/gameAssets.ts` |
+| Внешний вид куба/сетки в runtime | `pixi/BoardLayer.ts`, `pixi/FigureLayer.ts`, `pixi/EffectsLayer.ts` |
 | Фон | `pixi/BackgroundLayer.ts` (ровная светло-коричневая заливка) |
 | Анимации очистки/воды | `pixi/EffectsLayer.ts` (`playLineClear`/`playCellsVanish`/`popCube`) |
 | Анимированная защитная очистка поля | `GameScene.playBoardClear` + `GameApplication.playBoardClear` + `GameCore.handleProtectionClear` |
@@ -265,7 +268,7 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 
 1. **Поле `title` удалено** из `LevelConfig`. Редактор оперирует только `levelId`; в игре HUD показывает «Уровень N», где N извлекается из `levelId` (`formatLevelLabel`).
 2. **Поле `hasWater` удалено** из `BoardCell`/`BoardCellConfig`/`ClearedCellCoord`. Все кубики считаются «с водой»: капли/очки при очистке формируются для каждой клетки независимо от флага. Кисть «Блок с водой» из редактора убрана.
-3. **Редактор визуала урезан:** выбор `backgroundId` и `cubeStyle` убран из UI. `cubeStyle` остаётся дефолтом в `normalize`, а `backgroundId` пока сохранён только в данных для совместимости и не влияет на рендер: `BackgroundLayer` рисует единый светло-коричневый фон. Тумблер `showDebugGrid` теперь **реально работает** — рисует отладочную сетку в `BoardLayer`.
+3. **Редактор визуала урезан:** выбор `backgroundId` и `cubeStyle` убран из UI. `cubeStyle` остаётся legacy-полем в `normalize`, но runtime теперь использует фиксированные sprite-ассеты из `public/game`; `backgroundId` пока сохранён только в данных для совместимости и не влияет на рендер: `BackgroundLayer` рисует единый светло-коричневый фон. Тумблер `showDebugGrid` теперь **реально работает** — рисует отладочную сетку в `BoardLayer`.
 4. **Фигуры в редакторе** показываются мини-превью (`FigurePreview`) вместо «#id».
 5. **Кламп очков** по `targetScore` при начислении — счёт не может превысить цель (нет «100/60»).
 6. **Левитация фигур** больше не «дёргается» при установке — `FigureLayer.draw` идемпотентен (`renderedKeys`).
@@ -278,6 +281,7 @@ React (GameCore) ──props/store──▶ GameApplication ──▶ GameScene 
 13. **Зона молотка зафиксирована 4×4** для всех уровней. Поля `areaRows/areaCols` удалены из `boosters.hammer` (тип, валидация, normalize, все 15 уровней, контролы редактора). Размер задаётся константой `HAMMER_AREA_SIZE` в [HammerController.ts](src/widgets/game-core/pixi/HammerController.ts) (на полях меньше 4 клампится к размеру поля).
 14. **Скрипт стартовых фигур** (`figures.scriptedOpening?: ScriptedFigure[]`, новый тип `ScriptedFigure`): опционально жёстко задаёт фигуры первых наборов (до 3 наборов = 9 фигур). Слот без `shapeId` — случайный; цвет всегда случайный. Потребление отслеживается через `scriptedSetIndex` в `GameState` — **единый источник правды — стор** (initGame → 1; регенерация в `resolvePostMove`/`GameScene.afterClear` и в `clearBoardAndContinue` — +1). Курсор зеркалится в Pixi **отдельным** `GameApplication.setScriptedSetIndex(i)` (не через `updateState`, чтобы не дёргать `renderState`); сцена сообщает свой `nextScriptedSetIndex` обратно колбэком `onScriptedSetIndexUpdate`. `normalize` держит длину `scriptedOpening` кратной 3 (наборы целиком; набор из сплошь случайных слотов сохраняется, чтобы выбор «N наборов» переживал round-trip) и удаляет поле целиком, только если нигде нет ни одного `shapeId`. В редакторе — подблок «Стартовые фигуры (скрипт)» в `FiguresSection`. В ТЗ отсутствует.
 15. **Добавлен fallback для `structuredClone`** в редакторном состоянии: `useLevelEditor` клонирует `LevelConfig` через `globalThis.structuredClone`, а на старых Android WebView откатывается к `JSON.parse(JSON.stringify(...))`. Для текущей формы данных это безопасно и закрывает риск запуска на устройствах без нативного `structuredClone`.
+16. **Кубики и сетка переведены на реальные ассеты** из `public/game`: `BoardCell.color`/`figures.colors` теперь хранят asset-id (`green|orange|purple|red|yellow`), а не hex. Пустые клетки поля — стабильный детерминированный микс `box-1|box-2|box-3`; заполненные клетки, фигуры в слотах, drag-preview и pop-анимации очистки рендерятся через sprite-текстуры. `normalizeLevelConfig` сохраняет backward compatibility со старыми hex-конфигами, конвертируя их в новые id.
 
 Что было унифицировано в ту сессию (для истории):
 1. Next.js зафиксирован как **16** (был «15+» в ТЗ).

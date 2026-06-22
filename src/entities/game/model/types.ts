@@ -1,8 +1,11 @@
+import type { CubeColorId, GridBoxId } from "@/shared/lib/gameColors";
+
 export type BoosterType = "collectAll" | "multiplier" | "hammer";
+export type { CubeColorId, GridBoxId };
 
 export type BoardCellConfig = {
   filled: boolean;
-  color?: string;
+  color?: CubeColorId;
 };
 
 /**
@@ -25,7 +28,7 @@ export type LevelConfig = {
   figures: {
     availableShapeIds: string[];
     spawnWeights: Record<string, number>;
-    colors: string[];
+    colors: CubeColorId[];
     /**
      * Опциональный скрипт стартовых фигур: плоский упорядоченный список до 9
      * элементов (до 3 наборов по 3). Слот набора S, позиция i (0..2) берётся из
@@ -63,7 +66,7 @@ export type LevelConfig = {
 export type BoardCell = {
   id: string;
   filled: boolean;
-  color?: string;
+  color?: CubeColorId;
   figureId?: string;
 };
 
@@ -81,7 +84,7 @@ export type FigureInstance = {
   uid: string;
   shapeId: string;
   cells: FigureCell[];
-  color: string;
+  color: CubeColorId;
   placed: boolean;
 };
 
@@ -123,7 +126,7 @@ export type CompletedLine = {
 export type ClearedCellCoord = {
   row: number;
   col: number;
-  color?: string;
+  color?: CubeColorId;
 };
 
 export type ClearResult = {

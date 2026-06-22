@@ -66,7 +66,7 @@ export function generateFigureSet(
     for (let i = 0; i < 3; i++) {
       const shapeId = pinnedShapeId(i) ?? getRandomShapeId();
       const shape = FIGURE_SHAPES.find((s) => s.id === shapeId) || FIGURE_SHAPES[0];
-      const color = colors[Math.floor(Math.random() * colors.length)] || "#FF708A";
+      const color = colors[Math.floor(Math.random() * colors.length)] || "red";
 
       // Generate a secure but lightweight UID
       const uid = `fig-${shapeId}-${Date.now()}-${Math.floor(Math.random() * 1000000)}-${i}`;

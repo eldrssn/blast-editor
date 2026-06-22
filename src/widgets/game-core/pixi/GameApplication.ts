@@ -1,6 +1,7 @@
 import { Application } from "pixi.js";
 import { LevelConfig, BoardCell, FigureInstance } from "@/entities/game/model/types";
 import { GameScene, SCENE_W, SCENE_H, GameSceneCallbacks } from "./GameScene";
+import { preloadGameTextures } from "@/shared/lib/gameAssets";
 
 export class GameApplication {
   private app: Application;
@@ -29,6 +30,15 @@ export class GameApplication {
   };
 
   async init(config: LevelConfig): Promise<void> {
+    if (this._destroyed) return;
+
+    try {
+      await preloadGameTextures();
+    } catch (err) {
+      // Texture load failed (offline / missing asset). Keep initializing so the
+      // rest of the scene still renders; sprites fall back to empty textures.
+      console.error("Failed to preload game textures", err);
+    }
     if (this._destroyed) return;
 
     const { clientWidth, clientHeight } = this.container;

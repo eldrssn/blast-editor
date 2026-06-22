@@ -1,5 +1,6 @@
 import { LevelConfig } from "./types";
 import { FIGURE_SHAPES } from "../config/figureShapes";
+import { isMigratableCubeColorId } from "@/shared/lib/gameColors";
 
 const KNOWN_SHAPE_IDS = new Set(FIGURE_SHAPES.map((s) => s.id));
 
@@ -48,6 +49,13 @@ export function validateLevelConfig(config: Partial<LevelConfig> | null | undefi
           errors.push(`Строка initialBoard[${r}] должна быть массивом.`);
         } else if (row.length !== cols) {
           errors.push(`Длина строки initialBoard[${r}] (${row.length}) не соответствует grid.cols (${cols}).`);
+        } else {
+          for (let c = 0; c < cols; c++) {
+            const cell = row[c];
+            if (cell?.filled && cell.color && !isMigratableCubeColorId(cell.color)) {
+              errors.push(`Неизвестный цвет клетки initialBoard[${r}][${c}]: ${cell.color}.`);
+            }
+          }
         }
       }
     }
@@ -68,6 +76,11 @@ export function validateLevelConfig(config: Partial<LevelConfig> | null | undefi
     }
     if (!Array.isArray(colors) || colors.length === 0) {
       errors.push("Список цветов (figures.colors) должен быть непустым массивом.");
+    } else {
+      const invalidColors = colors.filter((color) => !isMigratableCubeColorId(color));
+      if (invalidColors.length > 0) {
+        errors.push(`Неизвестные цвета в figures.colors: ${invalidColors.join(", ")}.`);
+      }
     }
     if (!spawnWeights || typeof spawnWeights !== "object") {
       errors.push("Поле весов спавна (figures.spawnWeights) должно быть объектом.");

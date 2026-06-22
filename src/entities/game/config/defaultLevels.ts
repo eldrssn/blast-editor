@@ -1,19 +1,14 @@
-import { LevelConfig, BoardCellConfig } from "../model/types";
+import { LevelConfig, BoardCellConfig, CubeColorId } from "../model/types";
+import { CUBE_COLOR_IDS } from "@/shared/lib/gameColors";
 import { DEFAULT_FIGURE_WEIGHTS } from "./figureShapes";
 
-const defaultColors = [
-  "#FF708A", // Premium Rose
-  "#3CD070", // Premium Emerald
-  "#3C70FF", // Premium Cobalt
-  "#F59E0B", // Premium Amber
-  "#B070FF"  // Premium Purple
-];
+const defaultColors: CubeColorId[] = [...CUBE_COLOR_IDS];
 
-const ROSE = "#FF708A";
-const EMERALD = "#3CD070";
-const COBALT = "#3C70FF";
-const AMBER = "#F59E0B";
-const PURPLE = "#B070FF";
+const RED: CubeColorId = "red";
+const GREEN: CubeColorId = "green";
+const YELLOW: CubeColorId = "yellow";
+const ORANGE: CubeColorId = "orange";
+const PURPLE: CubeColorId = "purple";
 
 // Helper to create an empty initial board configuration
 function createEmptyInitialBoard(rows: number, cols: number): Array<Array<BoardCellConfig | null>> {
@@ -35,10 +30,10 @@ function createEmptyInitialBoard(rows: number, cols: number): Array<Array<BoardC
 function paintBoard(
   rows: number,
   cols: number,
-  paint: (set: (r: number, c: number, color: string) => void) => void
+  paint: (set: (r: number, c: number, color: CubeColorId) => void) => void
 ): Array<Array<BoardCellConfig | null>> {
   const board = createEmptyInitialBoard(rows, cols);
-  const set = (r: number, c: number, color: string) => {
+  const set = (r: number, c: number, color: CubeColorId) => {
     if (r >= 0 && r < rows && c >= 0 && c < cols) {
       board[r][c] = { filled: true, color };
     }
@@ -77,12 +72,12 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     initialBoard: (() => {
       const board = createEmptyInitialBoard(8, 8);
       // Place some random blocks on the board to start with
-      board[7][0] = { filled: true, color: "#3CD070" };
-      board[7][1] = { filled: true, color: "#3CD070" };
-      board[7][6] = { filled: true, color: "#3C70FF" };
-      board[7][7] = { filled: true, color: "#3C70FF" };
-      board[6][0] = { filled: true, color: "#FF708A" };
-      board[6][7] = { filled: true, color: "#FF708A" };
+      board[7][0] = { filled: true, color: GREEN };
+      board[7][1] = { filled: true, color: GREEN };
+      board[7][6] = { filled: true, color: YELLOW };
+      board[7][7] = { filled: true, color: YELLOW };
+      board[6][0] = { filled: true, color: RED };
+      board[6][7] = { filled: true, color: RED };
       return board;
     })(),
     figures: {
@@ -109,10 +104,10 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     initialBoard: (() => {
       const board = createEmptyInitialBoard(8, 8);
       // Put a solid block in the center to make it tricky
-      board[3][3] = { filled: true, color: "#B070FF" };
-      board[3][4] = { filled: true, color: "#B070FF" };
-      board[4][3] = { filled: true, color: "#B070FF" };
-      board[4][4] = { filled: true, color: "#B070FF" };
+      board[3][3] = { filled: true, color: PURPLE };
+      board[3][4] = { filled: true, color: PURPLE };
+      board[4][3] = { filled: true, color: PURPLE };
+      board[4][4] = { filled: true, color: PURPLE };
       return board;
     })(),
     figures: {
@@ -159,8 +154,8 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     grid: { rows: 8, cols: 8 },
     targetScore: 130,
     initialBoard: paintBoard(8, 8, (set) => {
-      set(7, 0, EMERALD); set(7, 1, EMERALD);
-      set(7, 6, COBALT); set(7, 7, COBALT);
+      set(7, 0, GREEN); set(7, 1, GREEN);
+      set(7, 6, YELLOW); set(7, 7, YELLOW);
     }),
     figures: {
       availableShapeIds: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
@@ -182,8 +177,8 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     grid: { rows: 8, cols: 8 },
     targetScore: 160,
     initialBoard: paintBoard(8, 8, (set) => {
-      set(0, 0, ROSE); set(0, 7, AMBER);
-      set(7, 0, COBALT); set(7, 7, PURPLE);
+      set(0, 0, RED); set(0, 7, ORANGE);
+      set(7, 0, YELLOW); set(7, 7, PURPLE);
     }),
     figures: {
       availableShapeIds: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"],
@@ -205,7 +200,7 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     grid: { rows: 8, cols: 8 },
     targetScore: 180,
     initialBoard: paintBoard(8, 8, (set) => {
-      for (let c = 2; c <= 5; c++) set(4, c, AMBER);
+      for (let c = 2; c <= 5; c++) set(4, c, ORANGE);
     }),
     figures: {
       availableShapeIds: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"],
@@ -227,7 +222,7 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     grid: { rows: 8, cols: 8 },
     targetScore: 200,
     initialBoard: paintBoard(8, 8, (set) => {
-      set(0, 0, ROSE); set(0, 1, ROSE); set(1, 0, ROSE); set(1, 1, ROSE);
+      set(0, 0, RED); set(0, 1, RED); set(1, 0, RED); set(1, 1, RED);
       set(6, 6, PURPLE); set(6, 7, PURPLE); set(7, 6, PURPLE); set(7, 7, PURPLE);
     }),
     figures: {
@@ -250,7 +245,7 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     grid: { rows: 8, cols: 8 },
     targetScore: 240,
     initialBoard: paintBoard(8, 8, (set) => {
-      for (const c of [0, 4, 7]) { set(0, c, COBALT); set(7, c, COBALT); }
+      for (const c of [0, 4, 7]) { set(0, c, YELLOW); set(7, c, YELLOW); }
     }),
     figures: {
       availableShapeIds: ["3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"],
@@ -273,7 +268,7 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     targetScore: 260,
     initialBoard: paintBoard(8, 8, (set) => {
       set(3, 3, PURPLE); set(3, 4, PURPLE); set(4, 3, PURPLE); set(4, 4, PURPLE);
-      set(0, 3, AMBER); set(0, 4, AMBER); set(7, 3, AMBER); set(7, 4, AMBER);
+      set(0, 3, ORANGE); set(0, 4, ORANGE); set(7, 3, ORANGE); set(7, 4, ORANGE);
     }),
     figures: {
       availableShapeIds: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"],
@@ -295,7 +290,7 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     grid: { rows: 8, cols: 8 },
     targetScore: 300,
     initialBoard: paintBoard(8, 8, (set) => {
-      for (let i = 0; i < 8; i++) set(i, i, ROSE);
+      for (let i = 0; i < 8; i++) set(i, i, RED);
     }),
     figures: {
       availableShapeIds: ["4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"],
@@ -318,7 +313,7 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     targetScore: 360,
     initialBoard: paintBoard(8, 8, (set) => {
       for (let r = 1; r < 8; r += 3) {
-        for (let c = 1; c < 8; c += 3) set(r, c, EMERALD);
+        for (let c = 1; c < 8; c += 3) set(r, c, GREEN);
       }
     }),
     figures: {
@@ -341,7 +336,7 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     grid: { rows: 8, cols: 8 },
     targetScore: 300,
     initialBoard: paintBoard(8, 8, (set) => {
-      set(5, 0, AMBER); set(5, 1, AMBER); set(6, 0, AMBER); set(6, 1, AMBER);
+      set(5, 0, ORANGE); set(5, 1, ORANGE); set(6, 0, ORANGE); set(6, 1, ORANGE);
     }),
     figures: {
       availableShapeIds: ["5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"],
@@ -364,8 +359,8 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     targetScore: 420,
     initialBoard: paintBoard(8, 8, (set) => {
       for (let i = 0; i < 8; i += 2) {
-        set(0, i, COBALT); set(7, i, COBALT);
-        set(i, 0, ROSE); set(i, 7, ROSE);
+        set(0, i, YELLOW); set(7, i, YELLOW);
+        set(i, 0, RED); set(i, 7, RED);
       }
     }),
     figures: {
@@ -390,9 +385,9 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     initialBoard: paintBoard(8, 8, (set) => {
       for (let i = 0; i < 8; i += 2) {
         set(0, i, PURPLE); set(7, i, PURPLE);
-        set(i, 0, AMBER); set(i, 7, AMBER);
+        set(i, 0, ORANGE); set(i, 7, ORANGE);
       }
-      set(3, 3, COBALT); set(3, 4, COBALT); set(4, 3, COBALT); set(4, 4, COBALT);
+      set(3, 3, YELLOW); set(3, 4, YELLOW); set(4, 3, YELLOW); set(4, 4, YELLOW);
     }),
     figures: {
       availableShapeIds: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"],

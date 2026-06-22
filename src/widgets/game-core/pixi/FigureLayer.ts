@@ -1,11 +1,12 @@
-import { Container, Graphics, FederatedPointerEvent } from "pixi.js";
+import { Container, Graphics, FederatedPointerEvent, Sprite } from "pixi.js";
 import { FigureInstance, GridPosition } from "@/entities/game/model/types";
-import { drawPseudo3DCube } from "./cube";
 import { soundManager } from "@/shared/lib/sound";
+import { getCubeTexture } from "@/shared/lib/gameAssets";
 
 const SLOT_COUNT = 3;
 const FIGURE_SCALE_IN_SLOT = 0.55;
 const SLOT_HEIGHT = 120;
+const FIGURE_CELL_GAP = 1.2;
 /** Space reserved at the very bottom of the scene for the HTML booster bar,
  * so the order top→bottom reads HUD → board → figures → boosters. */
 const BOOSTER_BAND = 70;
@@ -119,6 +120,49 @@ export class FigureLayer extends Container {
     this.on("pointerupoutside", this.onPointerUp, this);
   }
 
+  private createFigureVisual(
+    figure: FigureInstance,
+    cellSize: number,
+    gap: number,
+    alpha = 1
+  ): { visual: Container; width: number; height: number; minRow: number; minCol: number } {
+    const minRow = Math.min(...figure.cells.map((c) => c.row));
+    const maxRow = Math.max(...figure.cells.map((c) => c.row));
+    const minCol = Math.min(...figure.cells.map((c) => c.col));
+    const maxCol = Math.max(...figure.cells.map((c) => c.col));
+    const width = (maxCol - minCol + 1) * (cellSize + gap);
+    const height = (maxRow - minRow + 1) * (cellSize + gap);
+
+    const visual = new Container();
+
+    // Directional contact shadow under each cube — offset down-LEFT so the piece
+    // reads as lit from the top-right, matching the board. Drawn first (behind
+    // the cubes) and scaled to the cell so slot figures and the drag preview get
+    // a proportional shadow. The cube .webp itself is untouched.
+    const shadowOffset = Math.max(2, Math.round(cellSize * 0.1));
+    const shadowRadius = Math.max(3, Math.round(cellSize * 0.12));
+    const shadow = new Graphics();
+    for (const cell of figure.cells) {
+      const sx = (cell.col - minCol) * (cellSize + gap) - shadowOffset;
+      const sy = (cell.row - minRow) * (cellSize + gap) + shadowOffset;
+      shadow.roundRect(sx, sy, cellSize, cellSize, shadowRadius);
+    }
+    shadow.fill({ color: 0x000000, alpha: 0.22 });
+    visual.addChild(shadow);
+
+    for (const cell of figure.cells) {
+      const cube = new Sprite(getCubeTexture(figure.color));
+      cube.x = (cell.col - minCol) * (cellSize + gap);
+      cube.y = (cell.row - minRow) * (cellSize + gap);
+      cube.width = cellSize;
+      cube.height = cellSize;
+      cube.alpha = alpha;
+      visual.addChild(cube);
+    }
+
+    return { visual, width, height, minRow, minCol };
+  }
+
   /**
    * Draw the 3 figure slots at the bottom of the scene.
    */
@@ -134,7 +178,7 @@ export class FigureLayer extends Container {
     this.sceneHeight = sceneH;
 
     const cellSize = Math.max(boardCellSize * FIGURE_SCALE_IN_SLOT, 10);
-    const gap = 2;
+    const gap = FIGURE_CELL_GAP;
     const slotW = sceneW / SLOT_COUNT;
     const slotY = sceneH - SLOT_HEIGHT - BOOSTER_BAND;
 
@@ -173,29 +217,15 @@ export class FigureLayer extends Container {
       this.renderedKeys[i] = key;
       if (!shouldShow || !figure) continue;
 
-      // Compute figure bounding box
-      const minRow = Math.min(...figure.cells.map((c) => c.row));
-      const maxRow = Math.max(...figure.cells.map((c) => c.row));
-      const minCol = Math.min(...figure.cells.map((c) => c.col));
-      const maxCol = Math.max(...figure.cells.map((c) => c.col));
-      const figW = (maxCol - minCol + 1) * (cellSize + gap);
-      const figH = (maxRow - minRow + 1) * (cellSize + gap);
+      const { visual, width: figW, height: figH } = this.createFigureVisual(figure, cellSize, gap);
 
       const figContainer = new Container();
       figContainer.eventMode = "static";
       figContainer.cursor = "grab";
-
-      const figG = new Graphics();
       const originX = (slotW - figW) / 2;
       const originY = (SLOT_HEIGHT - figH) / 2 - 4;
-
-      for (const cell of figure.cells) {
-        const cx = originX + (cell.col - minCol) * (cellSize + gap);
-        const cy = originY + (cell.row - minRow) * (cellSize + gap);
-        drawPseudo3DCube(figG, cx, cy, cellSize, figure.color);
-      }
-
-      figContainer.addChild(figG);
+      visual.position.set(originX, originY);
+      figContainer.addChild(visual);
 
       figContainer.on("pointerdown", (e: FederatedPointerEvent) => {
         this.onFigurePointerDown(e, i);
@@ -207,9 +237,7 @@ export class FigureLayer extends Container {
       // figures (same uid) skip this and appear instantly in place.
       if (!this.seenUids.has(figure.uid)) {
         this.seenUids.add(figure.uid);
-        const centerX = originX + figW / 2;
-        const centerY = originY + figH / 2;
-        this.playSpawnAnimation(figContainer, figG, centerX, centerY, i * SPAWN_STAGGER_MS);
+        this.playSpawnAnimation(figContainer, visual, figW / 2, figH / 2, i * SPAWN_STAGGER_MS);
       }
     }
   }
@@ -251,7 +279,7 @@ export class FigureLayer extends Container {
     const localPos = this.toLocal(e.global);
     const figBounds = this.getFigureBoundsInCells(figure);
     const fullCellSize = this.boardCellSize;
-    const gap = 2;
+    const gap = FIGURE_CELL_GAP;
     const figW = figBounds.cols * (fullCellSize + gap);
     const figH = figBounds.rows * (fullCellSize + gap);
 
@@ -333,7 +361,7 @@ export class FigureLayer extends Container {
     if (!placed) {
       soundManager.play("invalid");
       // Return to slot with smooth animation
-      this.animateReturnToSlot(dragContainer, figureIndex, () => {
+      this.animateReturnToSlot(dragContainer, figureIndex, figure, () => {
         this.dragOverlay.removeChild(dragContainer);
         dragContainer.destroy({ children: true });
         // Re-render figures to show the figure back in slot
@@ -349,30 +377,11 @@ export class FigureLayer extends Container {
   private createDragFigure(figure: FigureInstance): Container {
     const container = new Container();
     const cellSize = this.boardCellSize;
-    const gap = 2;
-
-    const minRow = Math.min(...figure.cells.map((c) => c.row));
-    const minCol = Math.min(...figure.cells.map((c) => c.col));
-
-    // Soft contact shadow cast by the whole lifted figure (drawn first, behind
-    // the cubes, offset down-right so the piece reads as floating above the board).
-    const shadow = new Graphics();
-    const SHADOW_OFFSET = 10;
-    for (const cell of figure.cells) {
-      const cx = (cell.col - minCol) * (cellSize + gap);
-      const cy = (cell.row - minRow) * (cellSize + gap);
-      shadow.roundRect(cx + SHADOW_OFFSET, cy + SHADOW_OFFSET, cellSize, cellSize, 6);
-    }
-    shadow.fill({ color: 0x000000, alpha: 0.3 });
-    container.addChild(shadow);
-
-    const g = new Graphics();
-    for (const cell of figure.cells) {
-      const cx = (cell.col - minCol) * (cellSize + gap);
-      const cy = (cell.row - minRow) * (cellSize + gap);
-      drawPseudo3DCube(g, cx, cy, cellSize, figure.color, 0.92);
-    }
-    container.addChild(g);
+    const gap = FIGURE_CELL_GAP;
+    // The directional per-cube shadow comes from createFigureVisual (down-left,
+    // light from the top-right) — same as the slot figures and the board.
+    const { visual } = this.createFigureVisual(figure, cellSize, gap, 0.92);
+    container.addChild(visual);
     container.alpha = 0.95;
     return container;
   }
@@ -465,15 +474,17 @@ export class FigureLayer extends Container {
    */
   private playSpawnAnimation(
     container: Container,
-    figG: Graphics,
-    centerX: number,
-    centerY: number,
+    visual: Container,
+    pivotX: number,
+    pivotY: number,
     delay: number
   ) {
-    // Scale figG around the figure's center so it grows from the middle, not a corner.
-    figG.pivot.set(centerX, centerY);
-    figG.position.set(centerX, centerY);
-    figG.scale.set(0);
+    // Scale the figure visual around its own center so it grows from the middle.
+    const baseX = visual.x;
+    const baseY = visual.y;
+    visual.pivot.set(pivotX, pivotY);
+    visual.position.set(baseX + pivotX, baseY + pivotY);
+    visual.scale.set(0);
     container.alpha = 0;
 
     const startTime = performance.now() + delay;
@@ -485,13 +496,13 @@ export class FigureLayer extends Container {
         return;
       }
       const t = Math.min(elapsed / SPAWN_DURATION_MS, 1);
-      figG.scale.set(easeOutBack(t));
+      visual.scale.set(easeOutBack(t));
       container.alpha = Math.min(t * 1.5, 1);
 
       if (t < 1) {
         this.scheduleRaf(animate);
       } else {
-        figG.scale.set(1);
+        visual.scale.set(1);
         container.alpha = 1;
       }
     };
@@ -532,16 +543,30 @@ export class FigureLayer extends Container {
   private animateReturnToSlot(
     container: Container,
     slotIndex: number,
+    figure: FigureInstance,
     onComplete: () => void
   ) {
+    const gap = FIGURE_CELL_GAP;
+    const bounds = this.getFigureBoundsInCells(figure);
+    const figW = bounds.cols * (this.boardCellSize + gap);
+    const figH = bounds.rows * (this.boardCellSize + gap);
+
     const slotW = this.sceneWidth / SLOT_COUNT;
     const slotY = this.sceneHeight - SLOT_HEIGHT - BOOSTER_BAND;
-    const targetX = slotIndex * slotW + slotW / 2 - 20;
-    const targetY = slotY + SLOT_HEIGHT / 2 - 20;
+    // Slot-centre coordinates (matches where draw() centres the slot figure).
+    const targetX = slotIndex * slotW + slotW / 2;
+    const targetY = slotY + SLOT_HEIGHT / 2 - 4;
+
+    const startScale = container.scale.x;
+    // Pivot around the figure's centre so the scale-down collapses toward the
+    // middle instead of the top-left corner. Compensate the position by the
+    // pivot shift so the figure doesn't jump when the pivot changes.
+    container.pivot.set(figW / 2, figH / 2);
+    container.x += (figW / 2) * startScale;
+    container.y += (figH / 2) * startScale;
 
     const startX = container.x;
     const startY = container.y;
-    const startScale = container.scale.x;
     const targetScale = FIGURE_SCALE_IN_SLOT;
     const duration = 220; // ms
     const startTime = performance.now();
